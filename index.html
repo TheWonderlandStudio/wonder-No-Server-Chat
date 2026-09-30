@@ -1,0 +1,2843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Global Chat • Discord Style</title>
+<link rel="icon" href="https://raw.githubusercontent.com/TheWonderlandStudio/Idiot_Box/main/electron/renderer/assets/idot_box.png">
+<style>
+  * { box-sizing: border-box; }
+  * { scrollbar-width: thin; scrollbar-color: #1e1f22 transparent; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #1e1f22; border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb:hover { background: #4e5058; border: 2px solid transparent; background-clip: content-box; }
+  :root {
+    --bg: #313338;
+    --side: #2b2d31;
+    --rail: #1e1f22;
+    --input: #383a40;
+    --text: #dbdee1;
+    --muted: #949ba4;
+    --blurple: #5865f2;
+    --green: #23a55a;
+    --hover: #35373c;
+    --border: #232428;
+  }
+  body {
+    margin: 0; height: 100vh; height: 100dvh; background: var(--rail); color: var(--text);
+    font-family: "gg sans", Whitney, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  }
+  /* ---------- LOGIN (discord style) ---------- */
+  #login { min-height: 100vh; min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 16px;
+    background: linear-gradient(135deg,#4752c4,#5865f2 45%,#7b5cf0); }
+  .card { width: 480px; max-width: 100%; background: #313338; border-radius: 8px; padding: 32px; box-shadow: 0 8px 40px rgba(0,0,0,.4); text-align: center; }
+  .card h2 { margin: 0; font-size: 24px; color: #fff; }
+  .card p.sub { color: var(--muted); font-size: 14px; margin: 8px 0 20px; }
+  .card label { display: block; text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .05em; color: #b5bac1; margin: 12px 0 6px; }
+  .card input { width: 100%; padding: 12px; border-radius: 4px; border: none; background: #1e1f22; color: #fff; font-size: 15px; outline: none; }
+  .card input:focus { outline: 2px solid var(--blurple); }
+  .preview { display: none; align-items: center; gap: 12px; margin-top: 14px; background: #2b2d31; border-radius: 8px; padding: 12px; text-align: left; }
+  .preview.show { display: flex; }
+  .preview img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: #111; }
+  .preview b { color: #fff; font-size: 15px; display: block; }
+  .preview span { font-size: 13px; color: var(--muted); }
+  #joinBtn { width: 100%; margin-top: 18px; padding: 13px; border: none; border-radius: 4px; background: var(--blurple); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; }
+  #joinBtn:hover:not(:disabled) { background: #4752c4; }
+  #joinBtn:disabled { opacity: .5; cursor: not-allowed; }
+  #loginError { color: #f38688; font-size: 13px; margin-top: 8px; min-height: 18px; }
+  #loginStatus { color: var(--muted); font-size: 13px; margin-top: 8px; min-height: 18px; }
+  .note { margin-top: 10px; font-size: 12px; color: var(--muted); }
+
+  /* ---------- APP ---------- */
+  #app { display: none; height: 100vh; height: 100dvh; grid-template-columns: 72px 240px minmax(0,1fr) 240px; }
+  /* server rail */
+  #rail { background: var(--rail); display: flex; flex-direction: column; align-items: center; padding: 12px 0; gap: 8px; overflow-y: auto; }
+  .srv { width: 48px; height: 48px; border-radius: 50%; background: var(--bg); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; cursor: pointer; transition: .15s; user-select: none; flex-shrink: 0; }
+  .srv:hover { border-radius: 16px; background: var(--blurple); }
+  .srv.active { border-radius: 16px; background: var(--blurple); }
+  .srv.me { background: transparent; padding: 0; overflow: hidden; }
+  .srv.me img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+  .srv.logo { padding: 0; overflow: hidden; }
+  .srv.logo img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; display: block; }
+  .app-logo { width: 56px; height: 56px; border-radius: 14px; object-fit: cover; margin-bottom: 12px; }
+  .sep { width: 32px; height: 2px; background: #35373c; border-radius: 2px; }
+  #railHome { position: relative; }
+  #railDMs { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  #railDMs:empty { display: none; }
+  .srv.dmav { padding: 0; overflow: hidden; position: relative; }
+  .srv.dmav img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; display: block; }
+  .srv.dmav.active { border-radius: 16px; box-shadow: 0 0 0 2px var(--blurple); }
+  #railAdd { background: transparent; border: 2px dashed #4e5058; color: var(--green); font-size: 22px; font-weight: 400; border-radius: 50%; }
+  #railAdd:hover { border-radius: 16px; background: var(--green); color: #fff; border-color: var(--green); }
+  .bdg { position: absolute; top: -3px; right: -3px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: #f23f43; color: #fff; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid var(--rail); }
+  /* channels */
+  #channels { background: var(--side); display: flex; flex-direction: column; min-height: 0; }
+  #channels .srv-name { padding: 14px 16px; border-bottom: 1px solid var(--border); font-weight: 700; color: #fff; font-size: 15px; display: flex; align-items: center; gap: 6px; }
+  #channels .srv-name span { color: var(--green); font-size: 12px; font-weight: 600; }
+  .ch-group { padding: 14px 8px; overflow-y: auto; flex: 1; }
+  .ch-label { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .05em; padding: 0 8px; margin-bottom: 6px; }
+  .ch { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; border: none; background: transparent; color: var(--muted); padding: 7px 8px; border-radius: 4px; font-size: 14px; font-weight: 500; cursor: pointer; }
+  .ch:hover { background: var(--hover); color: var(--text); }
+  .ch.active { background: #404249; color: #fff; }
+  .ch .hash { color: #80848e; font-weight: 700; font-size: 16px; }
+  .ch.active .hash { color: var(--text); }
+  #channels .mebox { background: #232428; padding: 8px; display: flex; align-items: center; gap: 8px; }
+  #channels .mebox img { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; background: #111; }
+  #channels .mebox .n { font-size: 13px; color: #fff; font-weight: 600; line-height: 1.2; }
+  #channels .mebox .s { font-size: 11px; color: var(--green); }
+  #channels .mebox button { margin-left: auto; background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 15px; }
+  #channels .mebox button:hover { color: #fff; }
+  /* chat */
+  main { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg); }
+  #chead { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--border); min-height: 52px; }
+  #menuBtn { display: none; background: transparent; border: none; color: var(--text); font-size: 19px; cursor: pointer; padding: 4px 8px 4px 0; flex-shrink: 0; }
+  #chead .hash { color: #80848e; font-size: 22px; font-weight: 700; flex-shrink: 0; }
+  #chead b { color: #fff; font-size: 15px; flex-shrink: 0; }
+  #chead .topic { font-size: 12px; color: var(--muted); border-left: 1px solid #3f4147; padding-left: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
+  #chead .right { margin-left: auto; display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); flex-shrink: 0; }
+  #chead .right button { background: var(--blurple); color: #fff; border: none; border-radius: 4px; padding: 7px 12px; font-weight: 600; cursor: pointer; font-size: 12px; }
+  #connInfo { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; cursor: default; }
+  .cdot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  .cdot.green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .cdot.yellow { background: #f0b232; }
+  .cdot.grey { background: #80848e; }
+  #messages { flex: 1; overflow-y: auto; padding: 12px 0 4px; }
+  .msg { display: flex; gap: 12px; padding: 6px 16px; }
+  .msg:hover { background: #2e3035; }
+  .msg img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0; background: #111; cursor: pointer; }
+  .msg .body { min-width: 0; }
+  .msg .head { display: flex; align-items: baseline; gap: 8px; }
+  .msg .head b { color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .msg .head b:hover { text-decoration: underline; }
+  .msg .head .tag { font-size: 11px; color: var(--muted); }
+  .msg .head .time { font-size: 11px; color: var(--muted); }
+  .msg .txt { font-size: 14px; color: var(--text); line-height: 1.45; word-break: break-word; white-space: pre-wrap; margin-top: 2px; }
+  .sys { text-align: center; font-size: 12px; color: var(--muted); padding: 6px; }
+  .sys span { background: #2b2d31; padding: 3px 12px; border-radius: 999px; display: inline-block; }
+  #typing { min-height: 22px; font-size: 12px; color: var(--text); font-weight: 600; padding: 2px 16px; }
+  #typing i { color: var(--muted); font-weight: 400; }
+  #inputWrap { padding: 0 16px 16px; }
+  #replyBar { display: none; align-items: center; gap: 8px; background: #2b2d31; border-left: 3px solid var(--blurple); border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; font-size: 13px; }
+  #replyBar.show { display: flex; }
+  #replyBar .rt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+  #replyBar .rt b { color: #fff; }
+  #replyBar button { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 14px; }
+  #replyBar button:hover { color: #fff; }
+  .msg { position: relative; }
+  .msg.flash { background: rgba(88,101,242,.15); }
+  .quote { border-left: 3px solid #4e5058; background: #2b2d31; border-radius: 0 6px 6px 0; padding: 6px 10px; margin-bottom: 4px; font-size: 13px; color: var(--muted); cursor: pointer; max-width: 520px; }
+  .quote b { color: #c4c9ce; }
+  .quote:hover { background: #35373c; }
+  .tools { display: none; position: absolute; top: 2px; right: 8px; width: max-content; max-width: calc(100% - 16px); background: #313338; border: 1px solid #232428; border-radius: 8px; padding: 2px 4px; gap: 2px; box-shadow: 0 4px 14px rgba(0,0,0,.4); z-index: 5; }
+  .msg:hover .tools, .msg.pin-tools .tools { display: flex; }
+  .tools button { background: transparent; border: none; font-size: 15px; padding: 5px 7px; border-radius: 6px; cursor: pointer; color: var(--muted); -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: none; }
+  .tools button:hover { background: #404249; transform: scale(1.15); }
+  .tools button.holding { background: #4752c4; color: #fff; transform: scale(1.25); }
+  .tools button.reply-btn { font-size: 13px; }
+  #emojiPicker { display: none; position: fixed; z-index: 100; background: #2b2d31; border: 1px solid #1e1f22; border-radius: 12px; padding: 6px; width: 376px; max-width: calc(100vw - 20px); box-shadow: 0 8px 30px rgba(0,0,0,.6); }
+  #emojiPicker.show { display: block; }
+  #emojiPicker.super { border-color: #a371f7; box-shadow: 0 8px 30px rgba(163,113,247,.4); }
+  #epStatus { font-size: 12px; color: var(--muted); padding: 10px; text-align: center; }
+  #epStatus:empty { display: none; }
+  emoji-picker { display: block; width: 100%; height: 380px; max-height: 60vh; max-height: 60dvh; }
+  /* gif picker */
+  #gifPicker { display: none; position: fixed; z-index: 100; background: #2b2d31; border: 1px solid #1e1f22; border-radius: 12px; padding: 10px; width: 360px; max-width: calc(100vw - 20px); box-shadow: 0 8px 30px rgba(0,0,0,.6); }
+  #gifPicker.show { display: block; }
+  .gif-head { display: flex; gap: 6px; margin-bottom: 8px; }
+  .gif-head input { flex: 1; min-width: 0; background: #1e1f22; border: none; border-radius: 6px; color: #fff; padding: 9px 12px; font-size: 13px; outline: none; }
+  .gif-head button { background: #383a40; border: none; border-radius: 6px; color: var(--text); padding: 0 11px; font-size: 15px; cursor: pointer; }
+  .gif-head button:hover { background: #404249; }
+  #gifKeyRow { display: none; gap: 6px; margin-bottom: 8px; }
+  #gifKeyRow.show { display: flex; }
+  #gifKeyRow input { flex: 1; min-width: 0; background: #1e1f22; border: none; border-radius: 6px; color: #fff; padding: 8px 10px; font-size: 12px; outline: none; }
+  #gifKeyRow button { background: var(--blurple); border: none; border-radius: 6px; color: #fff; padding: 0 12px; font-size: 12px; font-weight: 700; cursor: pointer; }
+  #gifGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; max-height: 320px; max-height: 45vh; max-height: 45dvh; overflow-y: auto; }
+  .gif-item { background: #1e1f22; border: none; border-radius: 8px; padding: 0; cursor: pointer; overflow: hidden; height: 110px; }
+  .gif-item:hover { outline: 2px solid var(--blurple); }
+  .gif-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .gif-status { grid-column: 1 / -1; text-align: center; color: var(--muted); font-size: 13px; padding: 20px; }
+  .gif-setup { grid-column: 1 / -1; font-size: 13px; color: var(--text); padding: 6px 4px; line-height: 1.65; }
+  .gif-setup ol { margin: 8px 0 0; padding-left: 20px; color: var(--muted); }
+  #inputBox .gif-btn { font-size: 11px; font-weight: 800; letter-spacing: .03em; }
+  /* 7tv emotes */
+  .chat-emote { height: 28px; vertical-align: middle; cursor: pointer; }
+  #epTabs { display: flex; gap: 6px; margin-bottom: 8px; }
+  #epTabs button { flex: 1; background: #1e1f22; border: none; border-radius: 6px; color: var(--muted); padding: 7px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  #epTabs button.on { background: var(--blurple); color: #fff; }
+  #sevenWrap { display: none; }
+  #sevenSearch { width: 100%; background: #1e1f22; border: none; border-radius: 6px; color: #fff; padding: 9px 12px; font-size: 13px; outline: none; margin-bottom: 8px; }
+  #sevenGrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; max-height: 300px; overflow-y: auto; }
+  #sevenGrid button { background: transparent; border: none; border-radius: 8px; padding: 6px 8px; cursor: pointer; display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; min-width: 0; }
+  #sevenGrid button:hover { background: #404249; }
+  #sevenGrid img { height: 30px; width: 30px; object-fit: contain; flex-shrink: 0; }
+  #sevenGrid span { font-size: 11px; color: var(--text); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* in-app profile modal */
+  #profileModal { display: none; position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,.6); align-items: center; justify-content: center; padding: 16px; }
+  #profileModal.show { display: flex; }
+  .pf-card { position: relative; width: 340px; max-width: 100%; background: var(--side); border-radius: 12px; overflow: hidden; box-shadow: 0 12px 40px rgba(0,0,0,.6); }
+  .pf-banner { height: 90px; background: linear-gradient(135deg,#4752c4,#5865f2 50%,#7b5cf0); }
+  #pfAvatar { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; background: #111; border: 5px solid var(--side); margin: -40px 0 0 16px; display: block; }
+  .pf-body { padding: 12px 16px 16px; }
+  .pf-name { color: #fff; font-size: 19px; font-weight: 700; }
+  .pf-user { font-size: 13px; color: var(--muted); margin-top: 1px; }
+  .pf-bio { font-size: 13px; color: var(--text); background: #1e1f22; border-radius: 8px; padding: 10px 12px; margin-top: 10px; line-height: 1.5; }
+  .pf-stats { font-size: 11px; color: var(--muted); margin-top: 10px; font-weight: 600; letter-spacing: .03em; }
+  .pf-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .pf-actions button { flex: 1; padding: 10px; border: none; border-radius: 6px; background: var(--blurple); color: #fff; font-weight: 600; cursor: pointer; font-size: 13px; }
+  .pf-actions button:hover { background: #4752c4; }
+  .pf-actions button.ghost { background: #383a40; }
+  .pf-actions button.ghost:hover { background: #404249; }
+  .reacts { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .reacts:empty { display: none; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; background: #2b2d31; border: 1px solid #4e5058; color: var(--text); border-radius: 8px; padding: 2px 9px; font-size: 13px; cursor: pointer; }
+  .chip:hover { border-color: var(--blurple); }
+  .chip.mine { background: rgba(88,101,242,.25); border-color: var(--blurple); }
+  .chip small { font-size: 12px; font-weight: 700; }
+  .chip span { font-size: 15px; line-height: 1; }
+  .chip img { border-radius: 0; display: block; }
+  .chip.imgchip { background: transparent; border-color: transparent; padding: 2px; gap: 4px; border-radius: 8px; }
+  .chip.imgchip:hover { border-color: var(--blurple); }
+  .chip.imgchip small { background: #2b2d31; border-radius: 999px; padding: 1px 7px; }
+  .chip.super { padding: 4px 12px; background: linear-gradient(135deg, rgba(88,101,242,.35), rgba(163,113,247,.35)); border-color: #a371f7; }
+  .chip.super span { font-size: 24px; }
+  .chip.super small { font-size: 13px; }
+  .msg.is-reply { background: rgba(88,101,242,.06); border-radius: 8px; }
+  .msg.is-reply:hover { background: rgba(88,101,242,.1); }
+  .msg.nav-sel { outline: 2px solid var(--blurple); outline-offset: -2px; border-radius: 8px; }
+  .reply-count { font-size: 11px; color: #8b9bff; cursor: pointer; margin-top: 5px; font-weight: 700; }
+  .reply-count:hover { text-decoration: underline; }
+  .mention { background: rgba(88,101,242,.3); color: #dee0fc; padding: 1px 5px; border-radius: 4px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .mention:hover { background: var(--blurple); color: #fff; }
+  .msg.mentioned { background: rgba(240,178,50,.1); border-left: 2px solid #f0b232; border-radius: 0 8px 8px 0; }
+  .msg.mentioned:hover { background: rgba(240,178,50,.16); }
+  #inputBox { background: var(--input); border-radius: 8px; display: flex; align-items: center; }
+  #inputBox input { flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: var(--text); font-size: 14px; padding: 13px 14px; }
+  #inputBox input::placeholder { color: #6d6f78; }
+  #inputBox button { background: var(--blurple); color: #fff; border: none; border-radius: 6px; margin-right: 8px; padding: 8px 14px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
+  #inputBox button:hover { background: #4752c4; }
+  #inputBox .icon-btn { background: transparent; color: #b5bac1; font-size: 19px; padding: 8px 2px 8px 10px; margin: 0; border-radius: 6px; }
+  #inputBox .icon-btn:hover { background: transparent; color: #fff; transform: scale(1.12); }
+  #stageBar { display: none; gap: 8px; padding: 0 0 8px; flex-wrap: wrap; }
+  #stageBar.show { display: flex; }
+  .staged { position: relative; width: 72px; height: 72px; border-radius: 0; overflow: hidden; background: #1e1f22; border: 1px solid #1e1f22; display: flex; align-items: center; justify-content: center; }
+  .staged img { width: 100%; height: 100%; object-fit: cover; }
+  .staged .sdoc { font-size: 28px; }
+  .staged button { position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border-radius: 50%; border: none; background: rgba(0,0,0,.7); color: #fff; font-size: 11px; cursor: pointer; line-height: 1; padding: 0; }
+  .staged button:hover { background: #ed4245; }
+  .attach { margin-top: 6px; max-width: 340px; }
+  .attach-img { max-width: 100%; max-height: 260px; border-radius: 0; cursor: pointer; display: block; }
+  .msg .attach-img { width: auto; height: auto; border-radius: 0; }
+  .file-card { display: flex; align-items: center; gap: 10px; background: #2b2d31; border: 1px solid #1e1f22; border-radius: 8px; padding: 10px 12px; margin-top: 6px; }
+  .fic { font-size: 22px; flex-shrink: 0; }
+  .fin { flex: 1; min-width: 0; }
+  .fnm { font-size: 13px; color: #fff; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fsz { font-size: 11px; color: var(--muted); }
+  .fdown { font-size: 12px; background: var(--blurple); color: #fff; border-radius: 6px; padding: 6px 10px; text-decoration: none; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
+  .fexp { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+  .fprog { height: 5px; background: #1e1f22; border-radius: 99px; margin-top: 6px; overflow: hidden; }
+  .fprog i { display: block; height: 100%; background: var(--blurple); width: 0; }
+  /* members */
+  #members { background: var(--side); overflow-y: auto; padding: 16px 12px; }
+  .m-label { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .05em; margin: 4px 8px 8px; }
+  .mem { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 4px; cursor: pointer; }
+  .mem:hover { background: var(--hover); }
+  .mem .av { position: relative; }
+  .mem img { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; background: #111; display: block; }
+  .mem .st { position: absolute; right: -2px; bottom: -2px; width: 12px; height: 12px; border-radius: 50%; background: var(--green); border: 3px solid var(--side); }
+  .mem .n { font-size: 14px; color: #b5bac1; font-weight: 500; }
+  .mem.you .n { color: #fff; }
+  .mem .u { font-size: 11px; color: var(--muted); }
+  /* friends view */
+  #friendsView { flex: 1; display: none; flex-direction: column; min-height: 0; min-width: 0; background: var(--bg); }
+  /* voice channels + stage + calls */
+  .vc-row { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; border: none; background: transparent; color: var(--muted); padding: 7px 8px; border-radius: 4px; font-size: 14px; font-weight: 500; cursor: pointer; }
+  .vc-row:hover { background: var(--hover); color: var(--text); }
+  .vc-row.active { background: #404249; color: #fff; }
+  .vc-row .vol { color: #80848e; font-weight: 700; font-size: 15px; }
+  .vc-row .cnt { margin-left: auto; font-size: 11px; color: var(--muted); }
+  .vc-mems { padding: 2px 8px 4px 30px; }
+  .vc-mem { display: flex; align-items: center; gap: 7px; padding: 3px 6px; border-radius: 4px; font-size: 13px; color: #b5bac1; }
+  .vc-mem img { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; background: #111; }
+  .vc-mem.speaking { color: #fff; }
+  .vc-mem.speaking img { box-shadow: 0 0 0 2px var(--green); }
+  .vc-mem .st-ic { margin-left: auto; font-size: 11px; }
+  #vcStage { display: none; gap: 10px; padding: 12px 16px 4px; flex-wrap: nowrap; overflow-x: auto; background: var(--bg); }
+  #vcStage.show { display: flex; }
+  .tile { position: relative; width: 220px; aspect-ratio: 16/9; border-radius: 10px; overflow: hidden; background: #0b0d10; flex-shrink: 0; }
+  .tile.screen { width: 100%; aspect-ratio: 16/9; max-height: 44vh; }
+  .tile video { width: 100%; height: 100%; display: block; background: #000; }
+  .tile video.camv { object-fit: cover; }
+  .tile video.screenv { object-fit: contain; }
+  .tile.mine video.camv { transform: scaleX(-1); }
+  .tile audio { display: none; }
+  .tile .tav { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .tile .tav img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; }
+  .tile.has-video .tav { display: none; }
+  .tile .tname { position: absolute; left: 6px; bottom: 5px; font-size: 11px; font-weight: 700; color: #fff; background: rgba(0,0,0,.55); padding: 2px 7px; border-radius: 5px; max-width: 90%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile.speaking { box-shadow: 0 0 0 2px var(--green); }
+  .tile .blocked { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.55); color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; text-align: center; padding: 8px; }
+  #vcPanel { display: none; background: #232428; border-top: 1px solid var(--border); padding: 10px; }
+  #vcPanel.show { display: block; }
+  #vcPanel .vc-phead { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; color: var(--green); margin-bottom: 8px; }
+  #vcPanel .vc-phead .vdot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+  #vcPanel .vlab { color: #fff; }
+  #vcPanel .vc-pctrl { display: flex; gap: 6px; justify-content: space-between; }
+  #vcPanel .vbtn { width: 38px; height: 38px; font-size: 16px; }
+  .vbtn { width: 40px; height: 40px; border-radius: 50%; border: none; background: #2b2d31; color: #fff; font-size: 17px; cursor: pointer; flex-shrink: 0; }
+  .vbtn:hover { background: #404249; }
+  .vbtn.off { background: #ed4245; }
+  .vbtn.on { background: var(--green); }
+  .vbtn.end { background: #ed4245; }
+  .vbtn.ring { animation: vring 1s infinite; }
+  @keyframes vring { 0%,100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+  #callModal { display: none; position: fixed; inset: 0; z-index: 300; background: rgba(4,5,7,.92); align-items: center; justify-content: center; padding: 16px; }
+  #callModal.show { display: flex; }
+  .call-card { width: 780px; max-width: 100%; max-height: 94vh; max-height: 94dvh; overflow-y: auto; background: #14161a; border: 1px solid #232428; border-radius: 16px; padding: 20px; }
+  .call-top { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; text-align: left; }
+  .call-top .cav { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; background: #111; flex-shrink: 0; }
+  .call-top .cav.ringing { animation: vring 1.2s infinite; box-shadow: 0 0 0 3px var(--green); }
+  .call-id { flex: 1; min-width: 0; }
+  .call-card h3 { margin: 0; color: #fff; font-size: 17px; }
+  .call-card .csub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .call-timer { color: #fff; font-weight: 700; font-size: 14px; background: #232428; padding: 5px 12px; border-radius: 999px; flex-shrink: 0; }
+  #callStageWrap { position: relative; }
+  #callTiles { position: relative; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 16px; min-height: 0; }
+  #callTiles:empty { display: none; }
+  #callTiles .tile.main { width: min(620px, 100%); }
+  #callTiles .tile.pip { position: absolute; right: 10px; bottom: 10px; width: 150px; z-index: 3; border: 2px solid #2b2d31; }
+  .call-ctrl { display: flex; gap: 12px; justify-content: center; margin-top: 6px; flex-wrap: wrap; }
+  .call-ctrl { display: flex; gap: 10px; justify-content: center; margin-top: 6px; flex-wrap: wrap; }
+  .call-ctrl .vbtn { width: 48px; height: 48px; font-size: 19px; }
+  .call-ctrl .vbtn span { display: block; font-size: 9px; font-weight: 700; }  #friendsHead { padding: 14px 20px 10px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+  #friendsHead b { color: #fff; font-size: 16px; flex-shrink: 0; }
+  #friendsHead input { flex: 1; max-width: 320px; background: #1e1f22; border: none; border-radius: 4px; color: #fff; padding: 8px 12px; font-size: 13px; outline: none; }
+  #friendsBody { flex: 1; overflow-y: auto; padding: 14px 20px; }
+  .f-label { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .05em; margin: 14px 0 6px; }
+  .f-label:first-child { margin-top: 0; }
+  .f-empty { font-size: 13px; color: var(--muted); padding: 6px 0 6px 8px; }
+  .f-row { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 8px; cursor: pointer; border-top: 1px solid #3f4147; }
+  .f-row:hover { background: var(--hover); }
+  .f-row .av { position: relative; flex-shrink: 0; }
+  .f-row img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: #111; display: block; }
+  .f-row .st { position: absolute; right: -2px; bottom: -2px; width: 14px; height: 14px; border-radius: 50%; background: var(--green); border: 3px solid var(--bg); }
+  .f-row .st.off { background: #80848e; }
+  .f-row .tx { flex: 1; min-width: 0; }
+  .f-row .n { color: #fff; font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .f-row .u { color: var(--muted); font-size: 12px; }
+  .f-row .fmsg { background: #2b2d31; border: none; color: var(--text); border-radius: 50%; width: 36px; height: 36px; font-size: 16px; cursor: pointer; flex-shrink: 0; }
+  .f-row .fmsg:hover { background: var(--blurple); }
+  .facts { display: flex; gap: 6px; flex-shrink: 0; }
+  .facts button { border: none; border-radius: 6px; padding: 8px 11px; font-size: 12px; font-weight: 700; cursor: pointer; background: #2b2d31; color: var(--text); }
+  .facts button.ok { background: var(--green); color: #fff; }
+  .facts button.ok:hover { filter: brightness(1.1); }
+  .facts button.no { background: #ed4245; color: #fff; }
+  .facts button.no:hover { filter: brightness(1.1); }
+  .facts button:disabled { opacity: .45; cursor: default; }
+  .pf-actions { flex-wrap: wrap; }
+  .pf-actions button { min-width: 100px; }
+  .unread { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #f23f43; color: #fff; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  @media (max-width: 1000px) { #app { grid-template-columns: 64px 200px minmax(0,1fr); } #members { display: none; } }
+  @media (max-width: 640px) {
+    #app { grid-template-columns: 56px minmax(0,1fr); }
+    #rail { padding: 10px 0; }
+    #rail .srv { width: 40px; height: 40px; font-size: 15px; }
+    #channels { display: none; }
+    #channels.open { display: flex; position: fixed; left: 0; top: 0; bottom: 0; width: 280px; max-width: 85vw; z-index: 50; box-shadow: 8px 0 30px rgba(0,0,0,.5); }
+    #menuBtn { display: block; }
+    #chead .topic { display: none; }
+    #chead { padding: 10px 12px; }
+    #messages .msg { padding: 6px 12px; }
+    #inputWrap { padding: 0 10px 10px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div class="card">
+    <img class="app-logo" src="https://raw.githubusercontent.com/TheWonderlandStudio/Idiot_Box/main/electron/renderer/assets/idot_box.png" alt="logo" onerror="this.remove()">
+    <h2>Welcome back!</h2>
+    <p class="sub">Global Chat me wapas aane ke liye GitHub username dalo</p>
+    <label>GITHUB USERNAME</label>
+    <input id="ghInput" placeholder="e.g. torvalds" maxlength="39" autocomplete="off" spellcheck="false">
+    <div class="preview" id="ghPreview">
+      <img id="ghAvatar" alt="">
+      <div><b id="ghName">—</b><span id="ghUser">—</span></div>
+    </div>
+    <div id="loginStatus"></div>
+    <div id="loginError"></div>
+    <button id="joinBtn" onclick="joinChat()" disabled>Log In with GitHub</button>
+    <div class="note">WebRTC P2P • messages server par save nahi hote</div>
+  </div>
+</div>
+
+<div id="app">
+  <div id="rail">
+    <div class="srv logo active" id="railHome" title="Friends" onclick="toggleFriends()"><img src="https://raw.githubusercontent.com/TheWonderlandStudio/Idiot_Box/main/electron/renderer/assets/idot_box.png" alt="logo" onerror="this.remove()"><span class="bdg" id="railBdg" style="display:none"></span></div>
+    <div class="sep"></div>
+    <div id="railDMs"></div>
+    <div class="srv" id="railAdd" title="New DM" onclick="showFriends()">+</div>
+    <div class="sep"></div>
+    <div class="srv me" title="you"><img id="railAvatar" alt=""></div>
+  </div>
+
+  <div id="channels">
+    <div class="srv-name">Global Chat <span>● P2P</span></div>    <div class="ch-group">
+      <div class="ch-label">TEXT CHANNELS</div>
+      <div id="channelList"></div>
+      <div class="ch-label" style="margin-top:14px">VOICE CHANNELS</div>
+      <div id="voiceList"></div>
+    </div>
+    <div id="vcPanel">
+      <div class="vc-phead"><span class="vdot"></span><span id="vcLabel">Voice Connected</span></div>
+      <div class="vc-pctrl">
+        <button class="vbtn" id="vcMuteBtn" onclick="toggleMute()" title="Mute">🎙️</button>
+        <button class="vbtn" id="vcCamBtn" onclick="toggleCam()" title="Camera">📷</button>
+        <button class="vbtn" id="vcScreenBtn" onclick="toggleScreen()" title="Share screen">🖥️</button>
+        <button class="vbtn end" onclick="hangUp()" title="Disconnect">📞</button>
+      </div>
+    </div>
+    <div class="mebox">
+      <img id="meAvatar" alt="">
+      <div><div class="n" id="meName">—</div><div class="s">● online</div></div>
+      <button onclick="leaveChat()" title="Log out">⏻</button>
+    </div>
+  </div>
+
+  <main>
+    <div id="friendsView">
+      <div id="friendsHead"><b>Friends</b><input id="friendSearch" placeholder="Search friends" autocomplete="off"></div>
+      <div id="friendsBody"></div>
+    </div>
+    <div id="chead">
+      <button id="menuBtn" onclick="toggleMenu(event)" title="Channels">☰</button>
+      <span class="hash">#</span><b id="channelName">global</b>
+      <span class="topic" id="channelTopic"></span>
+      <div class="right"><span id="connInfo" title="Peer connection status"></span><span id="headCount"></span><button id="callVoiceBtn" onclick="callCurrent(false)" title="Voice call" style="display:none">📞</button><button id="callVideoBtn" onclick="callCurrent(true)" title="Video call" style="display:none">🎥</button><button id="inviteBtn" onclick="copyInvite()">Invite</button></div>
+    </div>
+    <div id="vcStage"></div>
+    <div id="messages"></div>
+    <div id="typing"></div>
+    <div id="inputWrap">
+      <div id="replyBar"><span class="rt" id="replyText"></span><button onclick="cancelReply()" title="Cancel">✕</button></div>
+      <div id="stageBar"></div>
+      <form id="inputBox" onsubmit="sendMessage(event)">
+        <button type="button" class="icon-btn" onclick="attachFile()" title="Attach file">📎</button>
+        <button type="button" class="icon-btn gif-btn" onclick="toggleGif(event)" title="GIFs">GIF</button>
+        <input id="messageInput" placeholder="Message #global" autocomplete="off" maxlength="1000">
+        <button type="button" class="icon-btn" onclick="toggleInputPicker(event,this)" title="Emoji">😊</button>
+        <button>Send</button>
+      </form>
+      <input type="file" id="fileInput" hidden multiple>
+    </div>
+  </main>
+
+  <div id="members">
+    <div class="m-label" id="memberLabel">ONLINE — 1</div>
+    <div id="memberList"></div>
+  </div>
+</div>
+<div id="emojiPicker"><div id="epTabs"><button data-t="emoji" class="on">😊 Emoji</button><button data-t="seven">✨ Emotes</button></div><div id="epStatus"></div><div id="epWrap"></div><div id="sevenWrap"><input id="sevenSearch" placeholder="Search emotes" autocomplete="off"><div id="sevenGrid"></div></div></div>
+<div id="gifPicker">
+  <div class="gif-head"><input id="gifSearch" placeholder="Search GIFs" autocomplete="off"><button id="gifKeyBtn" title="Tenor API key">⚙️</button><button id="gifClose" title="Close">✕</button></div>
+  <div id="gifKeyRow"><input id="gifKey" placeholder="Tenor API key (free)" autocomplete="off"><button id="gifKeySave">Save</button></div>
+  <div id="gifGrid"></div>
+</div>
+<div id="callModal">
+  <div class="call-card">
+    <div class="call-top">
+      <img class="cav" id="callAvatar" alt="" style="display:none">
+      <div class="call-id">
+        <h3 id="callTitle">Call</h3>
+        <div class="csub" id="callSub"></div>
+      </div>
+      <div class="call-timer" id="callTimer" style="display:none">00:00</div>
+    </div>
+    <div id="callStageWrap">
+      <div id="callTiles"></div>
+    </div>
+    <div class="call-ctrl" id="callCtrlRing" style="display:none">
+      <button class="vbtn on" onclick="acceptCall()" title="Accept">📞<span>Accept</span></button>
+      <button class="vbtn end" onclick="rejectCall()" title="Reject">📞<span>Reject</span></button>
+    </div>
+    <div class="call-ctrl" id="callCtrlOut" style="display:none">
+      <button class="vbtn end" onclick="cancelCall()" title="Cancel">📞<span>Cancel</span></button>
+    </div>
+    <div class="call-ctrl" id="callCtrlIn" style="display:none">
+      <button class="vbtn" id="callMuteBtn" onclick="toggleMute()" title="Mute">🎙️<span>Mute</span></button>
+      <button class="vbtn" id="callCamBtn" onclick="toggleCam()" title="Camera">📷<span>Cam</span></button>
+      <button class="vbtn" id="callScreenBtn" onclick="toggleScreen()" title="Share screen">🖥️<span>Share</span></button>
+      <button class="vbtn end" onclick="hangUp()" title="End">📞<span>End</span></button>
+    </div>
+  </div>
+</div>
+<div id="profileModal">
+  <div class="pf-card">
+    <div class="pf-banner"></div>
+    <img id="pfAvatar" alt="">
+    <div class="pf-body">
+      <div class="pf-name" id="pfName">—</div>
+      <div class="pf-user" id="pfUser">—</div>
+      <div class="pf-bio" id="pfBio"></div>
+      <div class="pf-stats" id="pfStats"></div>
+      <div class="pf-actions">
+        <button id="pfAdd">➕ Add Friend</button>
+        <button id="pfDM">💬 Message</button>
+        <button id="pfCall">📞 Call</button>
+        <button id="pfMention">@ Mention</button>
+        <button id="pfGithub" class="ghost">GitHub ↗</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { joinRoom, selfId } from 'https://esm.sh/trystero@0.25.4';
+
+const APP_ID = 'global-gh-chat-v1-2026';
+const CHANNELS = [
+  { id: 'global', topic: 'Default global chat — sab yahin milte hain' },
+  { id: 'introductions', topic: 'Naye log apna intro do' },
+  { id: 'chill', topic: 'Random baatein, memes, chill' },
+];
+const $ = id => document.getElementById(id);
+
+let me = null;
+const MAX_FILE = 15 * 1024 * 1024;
+
+// ---------- convo system: channels + DMs, ek hi code path ----------
+// Neeche wale globals hamesha VIEWED convo ko mirror karte hain (bindConvo).
+// Room event handlers apne convo par handleFor() se chalte hain.
+let cur = null;
+const convos = new Map();
+let viewKey = null;
+// dost: friends set + incoming/outgoing requests (localStorage persisted)
+let friends = new Set(loadJSON('gh-friends', []));
+let reqIn = loadJSON('gh-friend-req', []);
+let reqOut = new Set(loadJSON('gh-friend-out', []));
+function saveFriends() {
+  try {
+    localStorage.setItem('gh-friends', JSON.stringify([...friends]));
+    localStorage.setItem('gh-friend-req', JSON.stringify(reqIn));
+    localStorage.setItem('gh-friend-out', JSON.stringify([...reqOut]));
+  } catch {}
+}
+const isFriend = gh => friends.has(String(gh).toLowerCase());
+function isOnline(gh) {
+  const low = String(gh).toLowerCase();
+  for (const cv of convos.values()) for (const p of cv.peers.values()) {
+    if (String(p.gh).toLowerCase() === low) return true;
+  }
+  return false;
+}
+function peerIdOf(gh, cv) {
+  const low = String(gh).toLowerCase();
+  const scope = cv ? [cv] : [...convos.values()].filter(c => c.kind === 'channel');
+  let found = null;
+  for (const c of scope) for (const [pid, p] of c.peers) {
+    if (String(p.gh).toLowerCase() === low) found = pid;
+  }
+  return found;
+}
+function updateFriendBadge() {
+  const b = $('railBdg');
+  if (!b) return;
+  if (reqIn.length) {
+    b.textContent = reqIn.length > 99 ? '99+' : reqIn.length;
+    b.style.display = 'flex';
+  } else b.style.display = 'none';
+}
+function renderFriendsIfVisible() {
+  if ($('friendsView').style.display === 'flex') renderFriends($('friendSearch').value || '');
+}
+function sendFriendReq(gh) {
+  if (!me || !gh) return;
+  gh = String(gh).replace(/^@/, '');
+  const low = gh.toLowerCase();
+  if (low === String(me.gh).toLowerCase()) return;
+  if (isFriend(gh)) { sysMsg('@' + gh + ' already friend hai ✓'); return; }
+  if (reqOut.has(low)) { sysMsg('@' + gh + ' ko request pehle se bheji hai'); return; }
+  const gc = convos.get('channel:global');
+  const pid = gc ? peerIdOf(gh, gc) : null;
+  if (!gc || !gc.room || !gc.acts.friend || !pid) {
+    sysMsg('⚠ @' + gh + ' abhi online nahi hai — online aane par try karo');
+    return;
+  }
+  reqOut.add(low); saveFriends();
+  try { handleFor(gc, () => { friendAct.send({ kind: 'req', to: gh, from: { gh: me.gh, name: me.name, avatar: me.avatar } }, { target: pid }); }); } catch {}
+  sysMsg('@' + gh + ' ko friend request bheji ✓');
+  renderFriendsIfVisible();
+}
+function acceptFriend(gh) {
+  const low = String(gh).toLowerCase();
+  friends.add(low);
+  reqIn = reqIn.filter(r => String(r.gh).toLowerCase() !== low);
+  saveFriends(); updateFriendBadge(); renderFriendsIfVisible();
+  const gc = convos.get('channel:global');
+  const pid = gc ? peerIdOf(gh, gc) : null;
+  if (gc && gc.room && gc.acts.friend && pid) {
+    try { handleFor(gc, () => { friendAct.send({ kind: 'accept', to: gh, from: { gh: me.gh, name: me.name, avatar: me.avatar } }, { target: pid }); }); } catch {}
+  }
+  sysMsg('🎉 @' + gh + ' ab tumhara friend hai!');
+}
+function declineFriend(gh) {
+  const low = String(gh).toLowerCase();
+  reqIn = reqIn.filter(r => String(r.gh).toLowerCase() !== low);
+  saveFriends(); updateFriendBadge(); renderFriendsIfVisible();
+  const gc = convos.get('channel:global');
+  const pid = gc ? peerIdOf(gh, gc) : null;
+  if (gc && gc.room && gc.acts.friend && pid) {
+    try { handleFor(gc, () => { friendAct.send({ kind: 'decline', to: gh, from: { gh: me.gh } }, { target: pid }); }); } catch {}
+  }
+}
+// dekhe gaye users (offline list ke liye yaad rakho)
+let knownUsers = loadJSON('gh-known-users', {});
+let knownSaveT = null;
+function rememberUser(u) {
+  if (!u || !u.gh) return;
+  if (me && String(u.gh).toLowerCase() === String(me.gh).toLowerCase()) return;
+  const low = String(u.gh).toLowerCase();
+  const prev = knownUsers[low] || {};
+  knownUsers[low] = { gh: u.gh, name: u.name || prev.name || u.gh, avatar: u.avatar || prev.avatar || '', lastSeen: Date.now() };
+  if (knownSaveT) return;
+  knownSaveT = setTimeout(() => {
+    knownSaveT = null;
+    try { localStorage.setItem('gh-known-users', JSON.stringify(knownUsers)); } catch {}
+  }, 4000);
+}
+let room = null, channelId = 'global';
+let chatAct, profileAct, historyAct, typingAct, reactAct, fileAct, dmPingAct, friendAct, dmAckAct, callAct;
+let peers = new Map(), typingPeers = new Map();
+let cachedMsgs = [], seenIds = new Set(), msgById = new Map();
+let reactions = {}, sreactions = {};
+let typingTimer = null;
+let replyTo = null;
+let replyNavId = null;
+let staged = [];
+let pickerFor = null;
+let pickerLoading = null;
+let pickerMode = 'react';
+
+function blankStore() { return { msgs: [], seen: new Set(), byId: new Map(), reacts: {}, sreacts: {} }; }
+function cacheKeyFor(cv) { return (cv.kind === 'dm' ? 'gh-dm-' : cv.kind === 'vc' ? 'gh-vc-' : cv.kind === 'call' ? 'gh-call-' : 'gh-chat-') + cv.id; }
+function reactKeyFor(cv) { return (cv.kind === 'dm' ? 'gh-dreact-' : 'gh-react-') + cv.id; }
+function sreactKeyFor(cv) { return (cv.kind === 'dm' ? 'gh-dsreact-' : 'gh-sreact-') + cv.id; }
+function loadJSON(k, fb) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? fb : v; } catch { return fb; } }
+function ensureConvo(kind, id, extra) {
+  const key = kind + ':' + id;
+  let cv = convos.get(key);
+  if (!cv) {
+    cv = {
+      kind, id, key,
+      roomId: kind === 'dm' ? 'dm-' + id : kind === 'vc' ? 'voice-' + id : kind === 'call' ? 'call-' + id : 'gh-room-' + id,
+      store: blankStore(), room: null, acts: {},
+      peers: new Map(), typing: new Map(),
+      unread: 0, announceTimer: null, lastSeen: new Map(),
+      peerGh: kind === 'dm' ? (extra && extra.peerGh) : null,
+      peer: kind === 'dm' ? (extra && extra.peer) || null : null,
+    };
+    cv.store.msgs = loadJSON(cacheKeyFor(cv), []);
+    cv.store.msgs.forEach(m => { if (m && m.id) { cv.store.seen.add(m.id); cv.store.byId.set(m.id, m); } });
+    cv.store.reacts = loadJSON(reactKeyFor(cv), {});
+    cv.store.sreacts = loadJSON(sreactKeyFor(cv), {});
+    convos.set(key, cv);
+  } else if (kind === 'dm' && extra && extra.peer && !cv.peer) cv.peer = extra.peer;
+  return cv;
+}
+function saveConvo(cv) {
+  try {
+    const clean = cv.store.msgs.slice(-150).map(m => (m.file ? { ...m, file: { ...m.file, url: null } } : m));
+    localStorage.setItem(cacheKeyFor(cv), JSON.stringify(clean));
+    localStorage.setItem(reactKeyFor(cv), JSON.stringify(cv.store.reacts));
+    localStorage.setItem(sreactKeyFor(cv), JSON.stringify(cv.store.sreacts));
+  } catch {}
+}
+function bindConvo(cv) {
+  cur = cv;
+  room = cv.room;
+  if (cv.kind === 'channel') channelId = cv.id;
+  chatAct = cv.acts.chat; profileAct = cv.acts.profile; historyAct = cv.acts.history;
+  typingAct = cv.acts.typing; reactAct = cv.acts.react; fileAct = cv.acts.file;
+  dmPingAct = cv.acts.dmPing;
+  friendAct = cv.acts.friend;
+  dmAckAct = cv.acts.dmack;
+  callAct = cv.acts.call;
+  peers = cv.peers; typingPeers = cv.typing;
+  cachedMsgs = cv.store.msgs; seenIds = cv.store.seen; msgById = cv.store.byId;
+  reactions = cv.store.reacts; sreactions = cv.store.sreacts;
+}
+// Doosre convo ke room events: uske store par chalao, DOM sirf viewed ho to chuo.
+function handleFor(cv, fn) {
+  const prev = cur;
+  bindConvo(cv);
+  try { return fn(prev ? prev.key : null); }
+  finally { if (prev) bindConvo(prev); }
+}
+const viewing = (cv, viewedKey) => cv.key === viewedKey;
+// peer hatao (leave event ya ghost prune) — tiles/members sab saaf
+function dropPeer(cv, peerId, showMsg) {
+  const p = cv.peers.get(peerId);
+  cv.peers.delete(peerId);
+  cv.typing.delete(peerId);
+  if (cv.lastSeen) cv.lastSeen.delete(peerId);
+  if (voice && voice.cv === cv) {
+    voice.remotes.delete(peerId);
+    voice.analysers.delete(peerId);
+    voice.speaking.delete(peerId);
+  }
+  renderVoiceUI();
+  if (voice && voice.isCall && voice.cv === cv && cv.peers.size === 0) remoteHungUp();
+  if (cur !== cv) return;
+  updateUsers(); renderTyping(); renderTiles();
+  if (p && showMsg) sysMsg('@' + p.gh + (cv.kind === 'dm' ? ' went offline' : ' left the channel'));
+}
+// 90s se chup peer = gaya (dead tab/bot) — har 20s me saaf karo
+setInterval(() => {
+  if (!me) return;
+  const now = Date.now();
+  convos.forEach(cv => {
+    if (!cv.room) return;
+    [...cv.peers.keys()].forEach(pid => {
+      const last = (cv.lastSeen && cv.lastSeen.get(pid)) || 0;
+      if (now - last > 90000) {
+        try { handleFor(cv, () => { dropPeer(cv, pid, false); }); } catch {}
+      }
+    });
+  });
+}, 20000);
+// tab wapas dikhe to turant announce (prune se bachne + jaldi dikhne ke liye)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible' || !me) return;
+  convos.forEach(cv => {
+    if (!cv.room) return;
+    try { handleFor(cv, () => { profileAct.send(me); }); } catch {}
+  });
+});
+
+const esc = s => String(s ?? '');
+const fmtTime = ts => { try { const d = new Date(ts); return d.toLocaleDateString([], { day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); } catch { return ''; } };
+const ghPng = gh => 'https://github.com/' + encodeURIComponent(gh) + '.png';
+const avatarFallback = (img, gh) => { img.onerror = null; img.src = ghPng(gh); };
+function fmtSize(b) { b = Number(b) || 0; if (b < 1024) return b + ' B'; if (b < 1048576) return (b / 1024).toFixed(1) + ' KB'; if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB'; return (b / 1073741824).toFixed(2) + ' GB'; }
+function saveCache() { if (cur) saveConvo(cur); }
+function saveReacts() { if (cur) saveConvo(cur); }
+function saveSreacts() { if (cur) saveConvo(cur); }
+
+// ---- sidebar: channels + DMs ----
+function dmProfile(cv) {
+  if (cv.peer) return cv.peer;
+  for (const p of cv.peers.values()) return { gh: p.gh, name: p.name, avatar: p.avatar };
+  const msgs = cv.store.msgs.filter(m => m.gh && m.gh.toLowerCase() !== (me && me.gh.toLowerCase()));
+  if (msgs.length) {
+    const m = msgs[msgs.length - 1];
+    return { gh: m.gh, name: m.name || m.gh, avatar: m.avatar || '' };
+  }
+  return { gh: cv.peerGh || '?', name: cv.peerGh || '?', avatar: '' };
+}
+function renderNav() {
+  const box = $('channelList');
+  box.innerHTML = '';
+  CHANNELS.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'ch' + (cur && cur.kind === 'channel' && cur.id === c.id ? ' active' : '');
+    const h = document.createElement('span'); h.className = 'hash'; h.textContent = '#';
+    const t = document.createElement('span'); t.textContent = ' ' + c.id;
+    b.append(h, t);
+    b.onclick = () => switchChannel(c.id);
+    box.appendChild(b);
+  });
+  renderRailDMs();
+  updateFriendBadge();
+}
+
+// rail me DM avatars (seedha yahi se DM kholo)
+function renderRailDMs() {
+  const rail = $('railDMs');
+  if (!rail) return;
+  rail.innerHTML = '';
+  [...convos.values()].filter(cv => cv.kind === 'dm').forEach(cv => {
+    const u = dmProfile(cv);
+    const b = document.createElement('div');
+    b.className = 'srv dmav' + (cur === cv ? ' active' : '');
+    b.title = '@' + u.gh;
+    const img = document.createElement('img');
+    img.src = u.avatar || ghPng(u.gh);
+    img.alt = '@' + u.gh;
+    img.onerror = () => avatarFallback(img, u.gh);
+    b.appendChild(img);
+    if (cv.unread > 0) {
+      const bd = document.createElement('span');
+      bd.className = 'bdg';
+      bd.textContent = cv.unread > 99 ? '99+' : cv.unread;
+      b.appendChild(bd);
+    }
+    b.onclick = () => switchConvo(cv);
+    rail.appendChild(b);
+  });
+}
+
+// ---- friends view (online + offline) ----
+window.toggleFriends = function () {
+  if ($('friendsView').style.display === 'flex') showChat();
+  else showFriends();
+};
+window.showFriends = function () {
+  $('railHome').classList.add('active');
+  $('chead').style.display = 'none';
+  $('messages').style.display = 'none';
+  $('typing').style.display = 'none';
+  $('inputWrap').style.display = 'none';
+  $('friendsView').style.display = 'flex';
+  renderFriends($('friendSearch').value || '');
+};
+window.showChat = function () {
+  if (!$('railHome')) return;
+  $('railHome').classList.remove('active');
+  $('chead').style.display = '';
+  $('messages').style.display = '';
+  $('typing').style.display = '';
+  $('inputWrap').style.display = '';
+  $('friendsView').style.display = 'none';
+};
+function renderFriends(filter) {
+  filter = (filter || '').trim().toLowerCase();
+  const online = new Map();
+  if (me) {
+    convos.forEach(cv => {
+      cv.peers.forEach(p => {
+        const low = String(p.gh).toLowerCase();
+        if (low !== String(me.gh).toLowerCase() && !online.has(low)) online.set(low, p);
+      });
+    });
+  }
+  const offline = [];
+  Object.values(knownUsers).forEach(u => {
+    const low = String(u.gh).toLowerCase();
+    if (me && low === String(me.gh).toLowerCase()) return;
+    if (!online.has(low)) offline.push(u);
+  });
+  const match = u => !filter || String(u.name || '').toLowerCase().includes(filter) || String(u.gh).toLowerCase().includes(filter);
+  const byName = (a, b) => String(a.name || a.gh).localeCompare(String(b.name || b.gh));
+  const body = $('friendsBody');
+  body.innerHTML = '';
+  const mkSection = (label, list, rowFn) => {
+    const lab = document.createElement('div');
+    lab.className = 'f-label';
+    lab.textContent = label + ' — ' + list.length;
+    body.appendChild(lab);
+    const shown = list.filter(match).sort(byName);
+    if (!shown.length) {
+      const em = document.createElement('div');
+      em.className = 'f-empty';
+      em.textContent = 'Koi nahi';
+      body.appendChild(em);
+      return;
+    }
+    shown.forEach(u => body.appendChild(rowFn(u)));
+  };
+  // 1. incoming requests (accept / decline)
+  if (reqIn.length) {
+    mkSection('FRIEND REQUESTS', reqIn.filter(match).sort(byName), r => {
+      const row = friendRow({ gh: r.gh, name: r.name || r.gh, avatar: r.avatar || '' }, isOnline(r.gh));
+      const acts = document.createElement('div');
+      acts.className = 'facts';
+      const ok = document.createElement('button');
+      ok.className = 'ok'; ok.textContent = '✓ Accept';
+      ok.onclick = ev => { ev.stopPropagation(); acceptFriend(r.gh); };
+      const no = document.createElement('button');
+      no.className = 'no'; no.textContent = '✕';
+      no.title = 'Decline';
+      no.onclick = ev => { ev.stopPropagation(); declineFriend(r.gh); };
+      acts.append(ok, no);
+      row.appendChild(acts);
+      return row;
+    });
+  }
+  // 2. accepted friends (online pehle)
+  const fl = [...friends].map(gh => findProfile(gh)).sort((a, b) => (isOnline(b.gh) - isOnline(a.gh)) || byName(a, b));
+  mkSection('FRIENDS', fl, u => friendRow(u, isOnline(u.gh)));
+  // 3. baaki online users (add button)
+  const restOnline = [...online.values()].filter(u => !isFriend(u.gh));
+  mkSection('ONLINE', restOnline, u => {
+    const row = friendRow(u, true);
+    row.appendChild(addBtn(u.gh));
+    return row;
+  });
+  // 4. offline known users (add button)
+  mkSection('OFFLINE', offline.filter(u => !isFriend(u.gh)), u => {
+    const row = friendRow(u, false);
+    row.appendChild(addBtn(u.gh));
+    return row;
+  });
+}
+function addBtn(gh) {
+  const acts = document.createElement('div');
+  acts.className = 'facts';
+  const b = document.createElement('button');
+  const sent = reqOut.has(String(gh).toLowerCase());
+  b.textContent = sent ? '✓ Sent' : '➕ Add';
+  b.disabled = sent;
+  if (!sent) b.onclick = ev => { ev.stopPropagation(); sendFriendReq(gh); renderFriends($('friendSearch').value || ''); };
+  acts.appendChild(b);
+  return acts;
+}
+function friendRow(u, isOnline) {
+  const row = document.createElement('div');
+  row.className = 'f-row';
+  const av = document.createElement('div'); av.className = 'av';
+  const img = document.createElement('img');
+  img.src = u.avatar || ghPng(u.gh);
+  img.onerror = () => avatarFallback(img, u.gh);
+  av.appendChild(img);
+  const st = document.createElement('div');
+  st.className = 'st' + (isOnline ? '' : ' off');
+  av.appendChild(st);
+  const tx = document.createElement('div'); tx.className = 'tx';
+  const nm = document.createElement('div'); nm.className = 'n'; nm.textContent = u.name || u.gh;
+  const un = document.createElement('div'); un.className = 'u'; un.textContent = '@' + u.gh;
+  tx.append(nm, un);
+  const msg = document.createElement('button');
+  msg.className = 'fmsg'; msg.textContent = '💬'; msg.title = 'DM karo';
+  msg.onclick = ev => { ev.stopPropagation(); openDM(u.gh); };
+  row.append(av, tx, msg);
+  row.onclick = () => openProfile(u.gh);
+  return row;
+}
+$('friendSearch').addEventListener('input', e => renderFriends(e.target.value));
+
+// ---- GitHub ----
+let ghValid = false, ghT = null;
+$('ghInput').addEventListener('input', () => {
+  $('loginError').textContent = '';
+  $('ghPreview').classList.remove('show');
+  $('joinBtn').disabled = true;
+  ghValid = false;
+  clearTimeout(ghT);
+  const u = $('ghInput').value.trim();
+  if (!u) { $('loginStatus').textContent = ''; return; }
+  $('loginStatus').textContent = 'Checking GitHub...';
+  ghT = setTimeout(() => checkGitHub(u), 500);
+});
+
+async function checkGitHub(u) {
+  const username = u.replace(/^@/, '').trim();
+  if (!/^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/.test(username)) {
+    $('loginStatus').textContent = ''; $('loginError').textContent = 'Galat username'; return;
+  }
+  try {
+    const res = await fetch('https://api.github.com/users/' + encodeURIComponent(username));
+    if (res.status === 404) { $('loginStatus').textContent = ''; $('loginError').textContent = 'GitHub par nahi mila'; return; }
+    if (res.status === 403) { setUser({ gh: username, name: username, avatar: ghPng(username), bio: '' }); $('loginStatus').textContent = ''; return; }
+    if (!res.ok) throw 0;
+    const j = await res.json();
+    setUser({ gh: j.login, name: j.name || j.login, avatar: j.avatar_url || ghPng(j.login), bio: j.bio || '' });
+    $('loginStatus').textContent = '';
+  } catch {
+    $('loginStatus').textContent = '';
+    // offline / GitHub down? saved profile se purane messages dekho
+    try {
+      const saved = JSON.parse(localStorage.getItem('gh-p2p-user') || 'null');
+      if (saved && saved.gh && String(saved.gh).toLowerCase() === username.toLowerCase()) {
+        setUser(saved);
+        $('loginStatus').textContent = 'Offline mode — saved profile, purane messages dikhenge';
+        return;
+      }
+    } catch {}
+    $('loginError').textContent = 'Network error';
+  }
+}
+
+function setUser(u) {
+  me = u; ghValid = true;
+  $('ghAvatar').src = u.avatar;
+  $('ghAvatar').onerror = () => avatarFallback($('ghAvatar'), u.gh);
+  $('ghName').textContent = u.name;
+  $('ghUser').textContent = '@' + u.gh;
+  $('ghPreview').classList.add('show');
+  $('joinBtn').disabled = false;
+  try { localStorage.setItem('gh-p2p-user', JSON.stringify(u)); } catch {}
+}
+
+(function init() {
+  const q = new URLSearchParams(location.search).get('channel');
+  if (q && CHANNELS.some(c => c.id === q)) channelId = q;
+  try {
+    const s = JSON.parse(localStorage.getItem('gh-p2p-user') || 'null');
+    if (s && s.gh) { $('ghInput').value = s.gh; checkGitHub(s.gh); }
+  } catch {}
+})();
+
+// ---- join / switch ----
+window.joinChat = async function () {
+  if (!ghValid || !me) { $('loginError').textContent = 'Pehle GitHub username dalo'; return; }
+  $('login').style.display = 'none';
+  $('app').style.display = 'grid';
+  $('meAvatar').src = me.avatar;
+  $('meAvatar').onerror = () => avatarFallback($('meAvatar'), me.gh);
+  $('railAvatar').src = me.avatar;
+  $('railAvatar').onerror = () => avatarFallback($('railAvatar'), me.gh);
+  $('meName').textContent = me.name;
+  renderNav();
+  const q = new URLSearchParams(location.search).get('channel');
+  await switchChannel(q && CHANNELS.some(c => c.id === q) ? q : 'global');
+};
+
+window.switchChannel = async function (id) {
+  id = (id || '').trim().toLowerCase().replace(/[^a-z0-9-_]/g, '');
+  if (!id || !CHANNELS.some(c => c.id === id)) return;
+  const cv = ensureConvo('channel', id);
+  ensureRoom(cv);
+  switchConvo(cv);
+};
+
+function switchConvo(cv) {
+  showChat();
+  cancelReply();
+  try { closePicker(); } catch {}
+  bindConvo(cv);
+  viewKey = cv.key;
+  renderNav();
+  if (cv.kind === 'dm') {
+    const u = dmProfile(cv);
+    document.querySelector('#chead .hash').textContent = '@';
+    $('channelName').textContent = u.gh;
+    $('channelTopic').textContent = 'Direct message';
+    $('messageInput').placeholder = 'Message @' + u.gh;
+    $('inviteBtn').style.display = 'none';
+    $('callVoiceBtn').style.display = '';
+    $('callVideoBtn').style.display = '';
+  } else {
+    document.querySelector('#chead .hash').textContent = '#';
+    const c = CHANNELS.find(x => x.id === cv.id);
+    $('channelName').textContent = cv.id;
+    $('channelTopic').textContent = c ? c.topic : '';
+    $('messageInput').placeholder = 'Message #' + cv.id;
+    $('inviteBtn').style.display = '';
+    $('callVoiceBtn').style.display = 'none';
+    $('callVideoBtn').style.display = 'none';
+    const url = new URL(location.href);
+    url.searchParams.set('channel', cv.id);
+    history.replaceState(null, '', url);
+  }
+  $('messages').innerHTML = '';
+  $('typing').innerHTML = '';
+  $('replyBar').classList.remove('show');
+  renderStage();
+  if (!cv.store.msgs.length) {
+    sysMsg(cv.kind === 'dm'
+      ? 'This is the beginning of your DM with @' + dmProfile(cv).gh + ' — WebRTC P2P'
+      : 'Welcome to #' + cv.id + ' — WebRTC P2P connected as @' + me.gh);
+  }
+  cv.store.msgs.forEach(m => renderMessage(m));
+  cv.unread = 0;
+  renderNav();
+  updateUsers();
+  renderTyping();
+  renderVoiceUI();
+  document.getElementById('channels').classList.remove('open');
+  $('messageInput').focus();
+}
+
+function dmPairKey(a, b) {
+  return [String(a).toLowerCase(), String(b).toLowerCase()].sort().join('--');
+}
+// DM bhejte waqt saamne wala room me nahi to global par ping (offline se wapas aane par kaam aayega)
+function pingDMpeer(cv) {
+  if (!cv || cv.kind !== 'dm' || !me || !cv.peerGh) return;
+  try { if (cv.room && Object.keys(cv.room.getPeers()).length > 0) return; } catch {}
+  const gc = convos.get('channel:global');
+  if (!gc || !gc.room || !gc.acts.dmPing) return;
+  try { handleFor(gc, () => { dmPingAct.send({ to: cv.peerGh, pair: cv.id, from: { gh: me.gh, name: me.name, avatar: me.avatar } }); }); } catch {}
+}
+function openDM(gh) {
+  if (!me || !gh) return;
+  gh = String(gh).replace(/^@/, '');
+  if (gh.toLowerCase() === String(me.gh).toLowerCase()) return;
+  const peer = findProfile(gh);
+  const cv = ensureConvo('dm', dmPairKey(me.gh, gh), { peerGh: peer.gh || gh, peer: { gh: peer.gh || gh, name: peer.name || gh, avatar: peer.avatar || '' } });
+  ensureRoom(cv);
+  // saamne wale ko channel par ping taaki wo bhi DM room join kare
+  const gc = convos.get('channel:global');
+  if (gc && gc.room && gc.acts.dmPing) {
+    try { handleFor(gc, () => { dmPingAct.send({ to: gh, pair: cv.id, from: { gh: me.gh, name: me.name, avatar: me.avatar } }); }); } catch {}
+  }
+  closeProfile();
+  switchConvo(cv);
+}
+
+// room join: ek convo ke liye ek baar; rooms switch par bhi joined rehte hain
+function ensureRoom(cv) {
+  if (cv.room) return;
+  const prev = cur;
+  bindConvo(cv);
+  const room = joinRoom({ appId: APP_ID }, cv.roomId);
+  cv.room = room;
+  const acts = {
+    profile: room.makeAction('profile'),
+    chat: room.makeAction('chat'),
+    history: room.makeAction('history'),
+    typing: room.makeAction('typing'),
+    react: room.makeAction('react'),
+    file: room.makeAction('file'),
+  };
+  if (cv.kind === 'channel') { acts.dmPing = room.makeAction('dmping'); acts.friend = room.makeAction('friend'); acts.call = room.makeAction('call'); }
+  if (cv.kind === 'dm') acts.dmack = room.makeAction('dmack');
+  cv.acts = acts;
+  bindConvo(cv);
+
+  profileAct.onMessage = (p, { peerId }) => handleFor(cv, viewedKey => {
+    if (!p || !p.gh) return;
+    const isNew = !peers.has(peerId);
+    peers.set(peerId, { gh: esc(p.gh).slice(0, 39), name: esc(p.name || p.gh).slice(0, 60), avatar: esc(p.avatar || '') });
+    cv.lastSeen.set(peerId, Date.now());
+    rememberUser({ gh: p.gh, name: p.name || p.gh, avatar: p.avatar || '' });
+    if (viewing(cv, viewedKey)) updateUsers();
+    if (isNew) {
+      if (viewing(cv, viewedKey)) sysMsg('@' + p.gh + (cv.kind === 'dm' ? ' joined the DM' : ' joined the channel'));
+      profileAct.send(me, { target: peerId }).catch(() => {});
+      const strip = m => (m.file ? { ...m, file: { ...m.file, url: null } } : m);
+      const recent = cachedMsgs.slice(-50).map(strip);
+      // DM: purane undelivered bhi saath bhejo (offline catch-up)
+      if (cv.kind === 'dm') {
+        const have = new Set(recent.map(r => r.id));
+        cachedMsgs.forEach(m => {
+          if (m.gh === (me && me.gh) && !m.delivered && !have.has(m.id)) { recent.push(strip(m)); have.add(m.id); }
+        });
+      }
+      if (recent.length) historyAct.send({ msgs: recent, reacts: reactions, sreacts: sreactions }, { target: peerId }).catch(() => {});
+      // channel par naya peer = usko pending DM wala ping (wo offline tha to ab join karega)
+      if (cv.kind === 'channel') {
+        const low = String(p.gh).toLowerCase();
+        convos.forEach(d => {
+          if (d.kind !== 'dm' || !d.room) return;
+          if (!d.id.split('--').includes(low)) return;
+          if (d.store.msgs.some(m => m.gh === (me && me.gh) && !m.delivered)) {
+            try { dmPingAct.send({ to: p.gh, pair: d.id, from: { gh: me.gh, name: me.name, avatar: me.avatar } }); } catch {}
+          }
+        });
+      }
+    }
+    renderVoiceUI();
+  });
+
+  const storeMsg = (m) => {
+    rememberUser({ gh: m.gh, name: m.name || m.gh, avatar: m.avatar || '' });
+    const msg = { id: esc(m.id), gh: esc(m.gh).slice(0, 39), name: esc(m.name || m.gh).slice(0, 60), avatar: esc(m.avatar || ''), text: esc(m.text).slice(0, 1000), ts: Number(m.ts) || Date.now(), reply: m.reply ? { id: esc(m.reply.id || ''), gh: esc(m.reply.gh || ''), name: esc(m.reply.name || '').slice(0, 60), text: esc(m.reply.text || '').slice(0, 200) } : null };
+    cachedMsgs.push(msg); msgById.set(msg.id, msg); saveCache();
+    return msg;
+  };
+
+  chatAct.onMessage = (m, { peerId }) => handleFor(cv, viewedKey => {
+    if (!m || !m.id || !m.text || seenIds.has(m.id)) return;
+    if (peerId) cv.lastSeen.set(peerId, Date.now());
+    seenIds.add(m.id);
+    const msg = storeMsg(m);
+    if (cv.kind === 'dm') { try { dmAckAct.send({ ids: [m.id] }); } catch {} }
+    if (viewing(cv, viewedKey)) renderMessage(msg);
+    else if (cv.kind === 'dm') { cv.unread++; renderNav(); }
+  });
+
+  historyAct.onMessage = (d) => handleFor(cv, viewedKey => {
+    if (!d || !Array.isArray(d.msgs)) return;
+    let added = false;
+    const addedIds = [];
+    d.msgs.forEach(m => {
+      if (!m || !m.id || seenIds.has(m.id)) return;
+      seenIds.add(m.id);
+      addedIds.push(m.id);
+      rememberUser({ gh: m.gh, name: m.name || m.gh, avatar: m.avatar || '' });
+      cachedMsgs.push({ id: esc(m.id), gh: esc(m.gh), name: esc(m.name), avatar: esc(m.avatar), text: esc(m.text).slice(0, 1000), ts: Number(m.ts) || Date.now(), reply: m.reply || null, file: m.file ? { name: esc(m.file.name || 'file').slice(0, 120), type: esc(m.file.type || ''), size: Number(m.file.size) || 0, url: null } : null });
+      added = true;
+    });
+    const mergeReacts = (target, src) => {
+    if (!src || typeof src !== 'object') return false;
+    let changed = false;
+    Object.entries(src).forEach(([mid, emap]) => {
+      if (!target[mid]) target[mid] = {};
+      Object.entries(emap).forEach(([e, arr]) => {
+        if (!Array.isArray(arr)) return;
+        if (!target[mid][e]) target[mid][e] = [];
+        arr.forEach(g => { if (!target[mid][e].includes(g)) { target[mid][e].push(g); changed = true; } });
+      });
+    });
+    return changed;
+  };
+  const rChanged = mergeReacts(reactions, d.reacts);
+  const sChanged = mergeReacts(sreactions, d.sreacts);
+  if (rChanged) saveReacts();
+  if (sChanged) saveSreacts();
+  if (!added && !rChanged && !sChanged) return;
+    cachedMsgs.forEach(m => msgById.set(m.id, m));
+    cachedMsgs.sort((a, b) => a.ts - b.ts);
+    saveCache();
+    if (cv.kind === 'dm' && addedIds.length) { try { dmAckAct.send({ ids: addedIds }); } catch {} }
+    // background DM me history se aaye to unread badge
+    if (cv.kind === 'dm' && addedIds.length && !viewing(cv, viewedKey)) { cv.unread += addedIds.length; renderNav(); }
+    if (!viewing(cv, viewedKey)) return;
+    $('messages').innerHTML = '';
+    cachedMsgs.forEach(renderMessage);
+  });
+
+  reactAct.onMessage = (d) => handleFor(cv, () => {
+    if (!d || !d.msgId || !d.emoji || !d.gh) return;
+    const store = d.super ? sreactions : reactions;
+    if (!store[d.msgId]) store[d.msgId] = {};
+    if (!store[d.msgId][d.emoji]) store[d.msgId][d.emoji] = [];
+    const arr = store[d.msgId][d.emoji];
+    if (d.on && !arr.includes(d.gh)) arr.push(d.gh);
+    if (!d.on) store[d.msgId][d.emoji] = arr.filter(g => g !== d.gh);
+    if (!store[d.msgId][d.emoji].length) delete store[d.msgId][d.emoji];
+    if (d.super) saveSreacts(); else saveReacts();
+    paintReacts(d.msgId);
+  });
+
+  if (cv.kind === 'channel' && acts.dmPing) {
+    const dmPing = acts.dmPing;    dmPing.onMessage = (d) => {
+      if (!d || !d.to || !d.pair || !d.from || !d.from.gh) return;
+      if (!me || String(d.to).toLowerCase() !== String(me.gh).toLowerCase()) return;
+      const fromGh = String(d.from.gh);
+      rememberUser({ gh: fromGh, name: d.from.name || fromGh, avatar: d.from.avatar || '' });
+      const dm = ensureConvo('dm', String(d.pair), { peerGh: fromGh, peer: { gh: fromGh, name: d.from.name || fromGh, avatar: d.from.avatar || '' } });
+      ensureRoom(dm);
+      renderNav();
+    };
+  }
+
+  if (cv.kind === 'channel' && acts.friend) {
+    const fr = acts.friend;
+    fr.onMessage = (d) => {
+      if (!d || !d.kind || !d.from || !d.from.gh || !me) return;
+      const fromGh = String(d.from.gh);
+      const low = fromGh.toLowerCase();
+      rememberUser({ gh: fromGh, name: d.from.name || fromGh, avatar: d.from.avatar || '' });
+      const mine = String(d.to || '').toLowerCase() === String(me.gh).toLowerCase();
+      if (d.kind === 'req') {
+        if (!mine || isFriend(fromGh)) return;
+        if (!reqIn.some(r => String(r.gh).toLowerCase() === low)) {
+          reqIn.push({ gh: fromGh, name: d.from.name || fromGh, avatar: d.from.avatar || '', ts: Date.now() });
+          saveFriends();
+        }
+        updateFriendBadge();
+        renderFriendsIfVisible();
+        if ($('friendsView').style.display !== 'flex') sysMsg('💌 @' + fromGh + ' ne friend request bheji! (💬 Friends dekho)');
+      } else if (d.kind === 'accept') {
+        if (!mine) return;
+        friends.add(low); reqOut.delete(low);
+        saveFriends(); updateFriendBadge(); renderFriendsIfVisible();
+        sysMsg('🎉 @' + fromGh + ' ne request accept ki — ab dost ho!');
+      } else if (d.kind === 'decline') {
+        if (!mine) return;
+        reqOut.delete(low);
+        saveFriends(); renderFriendsIfVisible();
+        sysMsg('@' + fromGh + ' ne request decline ki');
+      }
+    };
+  }
+
+  if (cv.kind === 'channel' && acts.call) setupCallSignal(cv, acts.call);
+
+  fileAct.onMessage = (data, { metadata }) => handleFor(cv, viewedKey => {
+    const md = metadata || {};
+    if (!md.id || seenIds.has(md.id)) return;
+    seenIds.add(md.id);
+    let url = null;
+    try {
+      const blob = new Blob([data], { type: md.ftype || 'application/octet-stream' });
+      url = URL.createObjectURL(blob);
+    } catch {}
+    const msg = {
+      id: esc(md.id), gh: esc(md.gh || 'unknown').slice(0, 39),
+      name: esc(md.name || md.gh || 'unknown').slice(0, 60),
+      avatar: esc(md.avatar || ''), text: esc(md.cap || '').slice(0, 1000), ts: Number(md.ts) || Date.now(),
+      reply: md.reply ? { id: esc(md.reply.id || ''), gh: esc(md.reply.gh || ''), name: esc(md.reply.name || '').slice(0, 60), text: esc(md.reply.text || '').slice(0, 200) } : null,
+      file: { name: esc(md.fname || 'file').slice(0, 120), type: esc(md.ftype || ''), size: Number(md.fsize) || 0, url }
+    };
+    rememberUser({ gh: md.gh, name: md.name || md.gh, avatar: md.avatar || '' });
+    cachedMsgs.push(msg); msgById.set(msg.id, msg); saveCache();
+    if (cv.kind === 'dm') { try { dmAckAct.send({ ids: [md.id] }); } catch {} }
+    if (viewing(cv, viewedKey)) renderMessage(msg);
+    else if (cv.kind === 'dm') { cv.unread++; renderNav(); }
+  });
+
+  if (cv.kind === 'dm' && acts.dmack) {
+    const da = acts.dmack;
+    da.onMessage = (d) => handleFor(cv, () => {
+      if (!d || !Array.isArray(d.ids)) return;
+      let changed = false;
+      d.ids.forEach(id => {
+        const m = msgById.get(id);
+        if (m && !m.delivered) { m.delivered = true; changed = true; }
+      });
+      if (changed) saveCache();
+    });
+  }
+
+  typingAct.onMessage = (d, { peerId }) => handleFor(cv, viewedKey => {
+    const p = peers.get(peerId);
+    const gh = (d && d.gh) || (p && p.gh) || 'someone';
+    if (peerId) cv.lastSeen.set(peerId, Date.now());
+    if (d && d.isTyping) {
+      typingPeers.set(peerId, gh);
+      clearTimeout(typingPeers.get(peerId + ':t'));
+      typingPeers.set(peerId + ':t', setTimeout(() => handleFor(cv, () => { typingPeers.delete(peerId); if (viewKey === cv.key) renderTyping(); }), 2500));
+    } else typingPeers.delete(peerId);
+    if (viewing(cv, viewedKey)) renderTyping();
+  });
+
+  room.onPeerJoin = peerId => handleFor(cv, () => { setTimeout(() => handleFor(cv, () => { try { profileAct.send(me, { target: peerId }); } catch {} }), 600); });
+  room.onPeerLeave = peerId => handleFor(cv, viewedKey => {
+    dropPeer(cv, peerId, viewing(cv, viewedKey));
+  });
+
+  setTimeout(() => { try { handleFor(cv, () => { profileAct.send(me); }); } catch {} }, 800);
+  cv.announceTimer = setInterval(() => { try { handleFor(cv, () => { profileAct.send(me); }); } catch {} }, 12000);
+  if (prev) bindConvo(prev);
+}
+
+// ---- messages ----
+window.sendMessage = function (e) {
+  e.preventDefault();
+  if (!room || !me) return;
+  const inp = $('messageInput');
+  const text = inp.value.trim();
+  // staged files hain to pehle wahi bhejo (caption ke saath)
+  if (staged.length) {
+    const cap = text.slice(0, 1000);
+    const items = staged.splice(0, staged.length);
+    renderStage();
+    inp.value = '';
+    const rp = replyTo ? { id: replyTo.id, gh: replyTo.gh, name: replyTo.name, text: replyTo.text.slice(0, 200) } : null;
+    items.forEach((s, i) => sendFile(s.file, i === 0 ? cap : '', i === 0 ? rp : null));
+    cancelReply();
+    try { typingAct.send({ gh: me.gh, isTyping: false }); } catch {}
+    pingDMpeer(cur);
+    return;
+  }
+  if (!text) return;
+  const msg = { id: selfId + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7), gh: me.gh, name: me.name, avatar: me.avatar, text: text.slice(0, 1000), ts: Date.now(), reply: replyTo ? { id: replyTo.id, gh: replyTo.gh, name: replyTo.name, text: replyTo.text.slice(0, 200) } : null };
+  seenIds.add(msg.id);
+  cachedMsgs.push(msg); msgById.set(msg.id, msg); saveCache();
+  renderMessage(msg);
+  try { chatAct.send(msg); } catch {}
+  inp.value = '';
+  cancelReply();
+  try { typingAct.send({ gh: me.gh, isTyping: false }); } catch {}
+  pingDMpeer(cur);
+};
+
+$('messageInput').addEventListener('input', () => {
+  if (!room || !me || typingTimer) return;
+  try { typingAct.send({ gh: me.gh, isTyping: true }); } catch {}
+  typingTimer = setTimeout(() => { typingTimer = null; try { typingAct.send({ gh: me.gh, isTyping: false }); } catch {} }, 2000);
+});
+
+function appendWithEmotes(box, text) {
+  text.split(/(\s+)/).forEach(p => {
+    if (!p) return;
+    const em = sevenMap[p];
+    if (em) {
+      const img = document.createElement('img');
+      img.className = 'chat-emote'; img.src = em.url; img.alt = p; img.title = p;
+      img.onclick = ev => { ev.stopPropagation(); insertSevenCode(p); };
+      img.onerror = () => { img.replaceWith(document.createTextNode(p)); };
+      box.appendChild(img);
+    } else box.appendChild(document.createTextNode(p));
+  });
+}
+function renderRichText(box, text) {
+  const re = /(^|[\s>(\[{])@([a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?)/g;
+  let last = 0, m, hitMe = false;
+  while ((m = re.exec(text))) {
+    const at = m.index + m[1].length;
+    if (at > last) appendWithEmotes(box, text.slice(last, at));
+    const gh = m[2];
+    const chip = document.createElement('span');
+    chip.className = 'mention';
+    chip.textContent = '@' + gh;
+    chip.title = 'Profile dekho';
+    chip.onclick = ev => { ev.stopPropagation(); openProfile(gh); };
+    box.appendChild(chip);
+    if (me && gh.toLowerCase() === String(me.gh).toLowerCase()) hitMe = true;
+    last = at + gh.length + 1;
+  }
+  if (last < text.length) appendWithEmotes(box, text.slice(last));
+  if (!box.hasChildNodes()) box.textContent = text;
+  return hitMe;
+}
+
+function renderMessage(m) {
+  if (!m || !m.id) return;
+  msgById.set(m.id, m);
+  const box = $('messages');
+  const row = document.createElement('div');
+  row.className = 'msg' + (m.reply && m.reply.id ? ' is-reply' : '');
+  row.dataset.msgid = m.id;
+  const img = document.createElement('img');
+  img.src = m.avatar || ghPng(m.gh);
+  img.onerror = () => avatarFallback(img, m.gh);
+  img.onclick = () => openProfile(m.gh);
+  const body = document.createElement('div');
+  body.className = 'body';
+  body.style.flex = '1';
+  body.style.minWidth = '0';
+  const head = document.createElement('div');
+  head.className = 'head';
+  const b = document.createElement('b'); b.textContent = m.name || m.gh;
+  b.onclick = () => openProfile(m.gh);
+  const tag = document.createElement('span'); tag.className = 'tag'; tag.textContent = '@' + m.gh;
+  const tm = document.createElement('span'); tm.className = 'time'; tm.textContent = fmtTime(m.ts);
+  head.append(b, tag, tm);
+  body.appendChild(head);
+  if (m.reply && m.reply.id) {
+    const q = document.createElement('div');
+    q.className = 'quote';
+    const qb = document.createElement('b'); qb.textContent = '@' + (m.reply.gh || 'unknown') + ' ';
+    const qs = document.createElement('span'); qs.textContent = (m.reply.text || '').slice(0, 120);
+    q.append(qb, qs);
+    q.title = 'Original message par jao';
+    q.onclick = () => {
+      const el = document.querySelector('[data-msgid="' + CSS.escape(m.reply.id) + '"]');
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1200); }
+    };
+    body.appendChild(q);
+  }
+  const tx = m.text ? document.createElement('div') : null;
+  if (tx) {
+    tx.className = 'txt';
+    const hitMe = renderRichText(tx, m.text);
+    // kisi aur ne mujhe mention kiya to poora message highlight
+    if (hitMe && me && m.gh !== me.gh) row.classList.add('mentioned');
+    body.appendChild(tx);
+  }
+  if (m.file) body.appendChild(renderAttach(m));
+  const rc = document.createElement('div'); rc.className = 'reacts';
+  body.appendChild(rc);
+  // hover toolbar: ek reply button + ek react button
+  const tools = document.createElement('div');
+  tools.className = 'tools';
+  const rb = document.createElement('button');
+  rb.className = 'reply-btn'; rb.textContent = '↩ Reply'; rb.title = 'Reply';
+  rb.onclick = ev => { ev.stopPropagation(); closePicker(); startReply(m.id); };
+  tools.appendChild(rb);
+  const reactBtn = document.createElement('button');
+  reactBtn.textContent = '😊'; reactBtn.title = 'React • long-press = Super ⚡';
+  bindReactPress(reactBtn, m.id);
+  tools.appendChild(reactBtn);
+  row.append(img, body, tools);
+  // touch: tap = toolbar pin, message long-press = reaction picker
+  row.addEventListener('click', () => {
+    if (row.dataset.pressFired === '1') { row.dataset.pressFired = ''; return; }
+    row.classList.toggle('pin-tools');
+  });
+  bindMsgPress(row, m.id);
+  box.appendChild(row);
+  paintReacts(m.id);
+  box.scrollTop = box.scrollHeight;
+  refreshReplyBadges();
+}
+
+// original message par "n replies" badge
+function refreshReplyBadges() {
+  const counts = {}, last = {};
+  cachedMsgs.forEach(m => {
+    if (m.reply && m.reply.id && msgById.has(m.reply.id)) {
+      counts[m.reply.id] = (counts[m.reply.id] || 0) + 1;
+      last[m.reply.id] = m.id;
+    }
+  });
+  document.querySelectorAll('#messages .msg').forEach(row => {
+    const id = row.dataset.msgid;
+    let badge = row.querySelector(':scope > .body > .reply-count');
+    if (counts[id]) {
+      if (!badge) {
+        badge = document.createElement('div');
+        badge.className = 'reply-count';
+        row.querySelector('.body').appendChild(badge);
+      }
+      badge.textContent = '↩ ' + counts[id] + (counts[id] === 1 ? ' reply' : ' replies');
+      badge.onclick = ev => {
+        ev.stopPropagation();
+        const t = document.querySelector('[data-msgid="' + CSS.escape(last[id]) + '"]');
+        if (t) { t.scrollIntoView({ behavior: 'smooth', block: 'center' }); t.classList.add('flash'); setTimeout(() => t.classList.remove('flash'), 1200); }
+      };
+    } else if (badge) badge.remove();
+  });
+}
+
+// ---- reply ----
+function startReply(id) {
+  const m = msgById.get(id);
+  if (!m) return;
+  replyTo = { id: m.id, gh: m.gh, name: m.name || m.gh, text: m.text || '' };
+  document.querySelectorAll('.msg.nav-sel').forEach(el => el.classList.remove('nav-sel'));
+  $('replyText').innerHTML = '';
+  const b = document.createElement('b'); b.textContent = 'Replying to @' + replyTo.gh + ' ';
+  const s = document.createElement('span'); s.textContent = replyTo.text.slice(0, 80);
+  $('replyText').append(b, s);
+  $('replyBar').classList.add('show');
+  $('messageInput').focus();
+}
+window.startReply = startReply;
+window.cancelReply = function () {
+  replyTo = null;
+  replyNavId = null;
+  document.querySelectorAll('.msg.nav-sel').forEach(el => el.classList.remove('nav-sel'));
+  $('replyBar').classList.remove('show');
+};
+// Ctrl+Up / Ctrl+Down se messages par reply navigate karo
+document.addEventListener('keydown', e => {
+  if (!room || !me) return;
+  if (e.key === 'Escape') { cancelReply(); closeProfile(); return; }
+  if (e.ctrlKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+    e.preventDefault();
+    if (!cachedMsgs.length) return;
+    let i = cachedMsgs.findIndex(m => m.id === replyNavId);
+    if (i === -1) i = e.key === 'ArrowUp' ? cachedMsgs.length - 1 : 0;
+    else i = Math.min(cachedMsgs.length - 1, Math.max(0, i + (e.key === 'ArrowUp' ? -1 : 1)));
+    const m = cachedMsgs[i];
+    if (!m) return;
+    replyNavId = m.id;
+    startReply(m.id);
+    const el = document.querySelector('[data-msgid="' + CSS.escape(m.id) + '"]');
+    if (el) { el.scrollIntoView({ block: 'nearest' }); el.classList.add('nav-sel'); }
+  }
+});
+
+// ---- reactions ----
+window.toggleReact = function (msgId, emoji) {
+  if (!room || !me || !msgId || !emoji) return;
+  if (!reactions[msgId]) reactions[msgId] = {};
+  if (!reactions[msgId][emoji]) reactions[msgId][emoji] = [];
+  const arr = reactions[msgId][emoji];
+  const has = arr.includes(me.gh);
+  if (has) reactions[msgId][emoji] = arr.filter(g => g !== me.gh);
+  else arr.push(me.gh);
+  if (!reactions[msgId][emoji].length) delete reactions[msgId][emoji];
+  saveReacts();
+  paintReacts(msgId);
+  try { reactAct.send({ msgId, emoji, gh: me.gh, on: !has }); } catch {}
+};
+
+window.toggleSuperReact = function (msgId, emoji) {
+  if (!room || !me || !msgId || !emoji) return;
+  if (!sreactions[msgId]) sreactions[msgId] = {};
+  if (!sreactions[msgId][emoji]) sreactions[msgId][emoji] = [];
+  const arr = sreactions[msgId][emoji];
+  const has = arr.includes(me.gh);
+  if (has) sreactions[msgId][emoji] = arr.filter(g => g !== me.gh);
+  else arr.push(me.gh);
+  if (!sreactions[msgId][emoji].length) delete sreactions[msgId][emoji];
+  saveSreacts();
+  paintReacts(msgId);
+  try { reactAct.send({ msgId, emoji, gh: me.gh, on: !has, super: true }); } catch {}
+};
+
+function paintReacts(msgId) {
+  const row = document.querySelector('[data-msgid="' + CSS.escape(msgId) + '"]');
+  if (!row) return;
+  const box = row.querySelector('.reacts');
+  if (!box) return;
+  box.innerHTML = '';
+  const mkChip = (e, arr, super_) => {
+    const emMatch = String(e).match(/^(7tv|bttv|ffz):(.+)$/);
+    const isImg = !!emMatch;
+    const c = document.createElement('button');
+    c.className = 'chip' + (super_ ? ' super' : '') + (isImg ? ' imgchip' : '') + (me && arr.includes(me.gh) ? ' mine' : '');
+    c.title = (super_ ? 'Super reaction • ' : '') + arr.map(g => '@' + g).join(', ');
+    if (isImg) {
+      const info = (emoteMaps()[emMatch[1]] || {})[emMatch[2]];
+      if (info) {
+        const im = document.createElement('img');
+        im.src = info.url; im.alt = info.name; im.title = (super_ ? 'Super • ' : '') + info.name;
+        im.style.height = super_ ? '24px' : '18px';
+        c.title = info.name + ' • ' + arr.map(g => '@' + g).join(', ');
+        c.appendChild(im);
+      } else {
+        const es = document.createElement('span'); es.textContent = '✨';
+        c.appendChild(es);
+      }
+    } else {
+      const es = document.createElement('span'); es.textContent = e;
+      c.appendChild(es);
+    }
+    const n = document.createElement('small'); n.textContent = arr.length;
+    c.append(n);
+    c.onclick = ev => { ev.stopPropagation(); (super_ ? toggleSuperReact : toggleReact)(msgId, e); };
+    box.appendChild(c);
+  };
+  Object.entries(sreactions[msgId] || {}).forEach(([e, arr]) => { if (arr && arr.length) mkChip(e, arr, true); });
+  Object.entries(reactions[msgId] || {}).forEach(([e, arr]) => { if (arr && arr.length) mkChip(e, arr, false); });
+}
+
+// ---- single react button + full emoji picker (search + categories + skin tones) ----
+function ensurePicker() {
+  if (customElements.get('emoji-picker')) return Promise.resolve();
+  if (pickerLoading) return pickerLoading;
+  $('epStatus').textContent = 'Loading emojis…';
+  pickerLoading = import('https://cdn.jsdelivr.net/npm/emoji-picker-element@1/index.js').then(() => {
+    const pk = document.createElement('emoji-picker');
+    pk.classList.add('dark');
+    pk.addEventListener('emoji-click', e => pickEmoji(e.detail.unicode));
+    $('epWrap').appendChild(pk);
+    $('epStatus').textContent = '';
+  }).catch(() => {
+    $('epStatus').textContent = 'Emoji load nahi hue — net check karo';
+    pickerLoading = null;
+  });
+  return pickerLoading;
+}
+// message par long-press (touch) = reaction picker kholo
+function bindMsgPress(row, msgId) {
+  let timer = null, sx = 0, sy = 0;
+  const start = e => {
+    if (e.target.closest('button, a, .chip')) return;
+    const t = e.touches[0];
+    if (!t) return;
+    sx = t.clientX; sy = t.clientY;
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      row.dataset.pressFired = '1';
+      try { navigator.vibrate && navigator.vibrate(25); } catch {}
+      row.classList.add('pin-tools');
+      const rbtn = row.querySelector('.tools button:nth-child(2)');
+      togglePicker(msgId, rbtn || row, 'react');
+    }, 450);
+  };
+  const move = e => {
+    if (!timer) return;
+    const t = e.touches[0];
+    if (!t) return;
+    if (Math.abs(t.clientX - sx) > 12 || Math.abs(t.clientY - sy) > 12) {
+      clearTimeout(timer); timer = null;
+    }
+  };
+  const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
+  row.addEventListener('touchstart', start, { passive: true });
+  row.addEventListener('touchmove', move, { passive: true });
+  row.addEventListener('touchend', cancel);
+  row.addEventListener('touchcancel', cancel);
+}
+// ek hi button: tap = normal react, long-press (450ms) = super react
+function bindReactPress(btn, msgId) {
+  let timer = null, fired = false, lastTouch = 0;
+  const HOLD_MOUSE = 800, HOLD_TOUCH = 450;
+  const start = delay => {
+    fired = false;
+    if (timer) clearTimeout(timer);
+    btn.classList.add('holding');
+    timer = setTimeout(() => {
+      timer = null;
+      fired = true;
+      btn.classList.remove('holding');
+      try { navigator.vibrate && navigator.vibrate(30); } catch {}
+      togglePicker(msgId, btn, 'super');
+    }, delay);
+  };
+  const cancel = () => {
+    if (timer) { clearTimeout(timer); timer = null; }
+    btn.classList.remove('holding');
+  };
+  // mouse (touch ke nakli mousedown ko ignore karo)
+  btn.addEventListener('mousedown', () => { if (Date.now() - lastTouch < 900) return; start(HOLD_MOUSE); });
+  // touch (thodi hilan-dulan par cancel mat karo)
+  btn.addEventListener('touchstart', () => { lastTouch = Date.now(); start(HOLD_TOUCH); }, { passive: true });
+  btn.addEventListener('touchend', () => { lastTouch = Date.now(); cancel(); });
+  btn.addEventListener('mouseup', cancel);
+  btn.addEventListener('mouseleave', cancel);
+  btn.addEventListener('touchcancel', cancel);
+  btn.oncontextmenu = e => e.preventDefault();
+  btn.onclick = ev => {
+    ev.stopPropagation();
+    if (fired) { fired = false; return; }
+    cancel();
+    togglePicker(msgId, btn, 'react');
+  };
+}
+// picker ko button ke paas, screen ke andar fit karke kholo
+function placePicker(r, align, el) {
+  const pk = el || $('emojiPicker');
+  pk.classList.add('show');
+  // actual size (emoji data abhi load ho raha ho to full height assume karo)
+  const pw = Math.max(pk.offsetWidth || 0, 200);
+  const ph = Math.max(pk.offsetHeight || 0, 400);
+  const vw = window.innerWidth, vh = window.innerHeight;
+  let x = align === 'right' ? r.right - pw - 8 : align === 'left' ? r.left + 8 : r.left - pw + 60;
+  x = Math.max(10, Math.min(x, vw - pw - 10));
+  let y = r.top - ph - 8;
+  if (y < 10) y = r.bottom + 8;
+  if (y + ph > vh - 10) y = Math.max(10, vh - ph - 10);
+  pk.style.left = x + 'px';
+  pk.style.top = y + 'px';
+}
+async function togglePicker(msgId, btn, mode) {
+  pickerMode = mode || 'react';
+  const pk = $('emojiPicker');
+  if (pickerFor === msgId && pickerMode === (pk.dataset.mode || 'react') && pk.classList.contains('show')) { closePicker(); return; }
+  pickerFor = msgId;
+  pk.dataset.mode = pickerMode;
+  pk.classList.toggle('super', pickerMode === 'super');
+  const r = btn.getBoundingClientRect();
+  placePicker(r, false);
+  await ensurePicker();
+}
+function pickEmoji(e) {
+  if (pickerMode === 'input') { insertEmoji(e); return; }
+  if (pickerMode === 'super' && pickerFor) { toggleSuperReact(pickerFor, e); closePicker(); return; }
+  if (pickerFor) toggleReact(pickerFor, e);
+  closePicker();
+}
+function insertEmoji(e) {
+  const inp = $('messageInput');
+  const s = inp.selectionStart ?? inp.value.length;
+  const en = inp.selectionEnd ?? inp.value.length;
+  inp.value = inp.value.slice(0, s) + e + inp.value.slice(en);
+  inp.focus();
+  try { inp.setSelectionRange(s + e.length, s + e.length); } catch {}
+}
+window.toggleInputPicker = async function (e, btn) {
+  if (e) e.stopPropagation();
+  const pk = $('emojiPicker');
+  if (pickerMode === 'input' && pk.classList.contains('show')) { closePicker(); return; }
+  pickerMode = 'input';
+  pickerFor = null;
+  pk.dataset.mode = 'input';
+  const r = $('inputBox').getBoundingClientRect();
+  placePicker(r, 'right');
+  await ensurePicker();
+  $('messageInput').focus();
+};
+function closePicker() {
+  pickerFor = null;
+  const pk = $('emojiPicker');
+  pk.classList.remove('show');
+  pk.classList.remove('super');
+}
+document.addEventListener('click', e => {
+  const pk = $('emojiPicker');
+  if (pk && pk.classList.contains('show') && !pk.contains(e.target)) closePicker();
+  const gp = $('gifPicker');
+  if (gp && gp.classList.contains('show') && !gp.contains(e.target) && !e.target.closest('#inputBox')) closeGif();
+  // autoplay-blocked voice audio ko click par unlock karo
+  if (voice) document.querySelectorAll('#audioSink audio').forEach(a => { if (a.paused) a.play().catch(() => {}); });
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closePicker(); closeProfile(); closeGif(); } });
+$('messages').addEventListener('wheel', () => { closePicker(); closeGif(); }, { passive: true });
+window.addEventListener('resize', () => closePicker());
+
+$('messages').addEventListener('wheel', () => { closePicker(); closeGif(); }, { passive: true });
+window.addEventListener('resize', () => closePicker());
+
+// ================= VOICE / VIDEO / CALLS (WebRTC media via Trystero) =================
+let voice = null;      // { cv, isCall, callId, peerGh, localStream, remotes, analysers, speaking, muted, camOn, sharing, camTrack, screenTrack }
+let callState = null;  // { callId, peerGh, video, dir, peerProfile }
+let AC = null, speakTimer = null, callTimer = null, callSec = 0, ringTimer = null, ringCtx = null, ringOsc = null;
+
+function voicePeerMedia(v, peerId, create) {
+  let r = v.remotes.get(peerId);
+  if (!r && create) { r = { media: new MediaStream(), kind: 'audio' }; v.remotes.set(peerId, r); }
+  return r;
+}
+function ensureAC() {
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === 'suspended') AC.resume().catch(() => {});
+  } catch {}
+  return AC;
+}
+function ensureAnalyser(v, peerId) {
+  const r = v.remotes.get(peerId);
+  if (!r || !r.media.getAudioTracks().length) return;
+  try {
+    const ac = ensureAC();
+    if (!ac) return;
+    const src = ac.createMediaStreamSource(r.media);
+    const an = ac.createAnalyser();
+    an.fftSize = 512;
+    src.connect(an);
+    v.analysers.set(peerId, { an, buf: new Uint8Array(an.fftSize) });
+  } catch {}
+}
+function analyserLevel(hit) {
+  try {
+    hit.an.getByteTimeDomainData(hit.buf);
+    let sum = 0;
+    for (let i = 0; i < hit.buf.length; i += 4) {
+      const v = (hit.buf[i] - 128) / 128;
+      sum += v * v;
+    }
+    return Math.sqrt(sum / (hit.buf.length / 4));
+  } catch { return 0; }
+}
+function ensureSpeakLoop() {
+  if (speakTimer || !voice) return;
+  speakTimer = setInterval(() => {
+    if (!voice) { clearInterval(speakTimer); speakTimer = null; return; }
+    voice.analysers.forEach((hit, pid) => {
+      const speaking = analyserLevel(hit) > 0.08;
+      if (voice.speaking.get(pid) !== speaking) {
+        voice.speaking.set(pid, speaking);
+        document.querySelectorAll('[data-peer="' + CSS.escape(pid) + '"]').forEach(el => el.classList.toggle('speaking', speaking));
+      }
+    });
+  }, 250);
+}
+function startVoiceIO(v) {
+  const room = v.cv.room;
+  try { room.addStream(v.localStream); } catch { sysMsg('⚠ Voice bhejne me dikkat'); }
+  const prevJoin = room.onPeerJoin;
+  room.onPeerJoin = peerId => {
+    try { prevJoin && prevJoin(peerId); } catch {}
+    setTimeout(() => { try { room.addStream(v.localStream, { target: peerId }); } catch {} }, 800);
+  };
+  const prevLeave = room.onPeerLeave;
+  room.onPeerLeave = peerId => {
+    try { prevLeave && prevLeave(peerId); } catch {}
+    v.remotes.delete(peerId);
+    v.analysers.delete(peerId);
+    v.speaking.delete(peerId);
+    renderTiles(); renderVoiceUI();
+    if (v.isCall && v.cv.peers.size === 0) remoteHungUp();
+  };
+  room.onPeerStream = (stream, peerId, metadata) => handleFor(v.cv, () => {
+    const r = voicePeerMedia(v, peerId, true);
+    stream.getTracks().forEach(t => { try { r.media.addTrack(t); } catch {} });
+    if (stream.getVideoTracks().length) r.kind = (metadata && metadata.kind) || 'cam';
+    if (stream.getAudioTracks().length) { v.analysers.delete(peerId); ensureAnalyser(v, peerId); }
+    renderTiles(); renderVoiceUI(); ensureAudioSink();
+  });
+  room.onPeerTrack = (track, stream, peerId, metadata) => handleFor(v.cv, () => {
+    const r = voicePeerMedia(v, peerId, true);
+    try { r.media.addTrack(track); } catch {}
+    if (track.kind === 'video') r.kind = (metadata && metadata.kind) || 'cam';
+    if (track.kind === 'audio') { v.analysers.delete(peerId); ensureAnalyser(v, peerId); }
+    renderTiles(); renderVoiceUI(); ensureAudioSink();
+  });
+  ensureSpeakLoop();
+}
+function peerProf(v, peerId) {
+  const p = v.cv.peers.get(peerId);
+  if (p) return { gh: p.gh, name: p.name || p.gh, avatar: p.avatar || '' };
+  return { gh: peerId.slice(0, 8), name: peerId.slice(0, 8), avatar: '' };
+}
+// saare remote audio yahi bajenge (tiles sirf video dikhate hain)
+function ensureAudioSink() {
+  let sink = $('audioSink');
+  if (!sink) {
+    sink = document.createElement('div');
+    sink.id = 'audioSink';
+    sink.style.display = 'none';
+    document.body.appendChild(sink);
+  }
+  if (!voice) { sink.innerHTML = ''; return; }
+  const have = new Set();
+  sink.querySelectorAll('audio').forEach(a => {
+    if (!voice.remotes.has(a.dataset.peer)) a.remove();
+    else have.add(a.dataset.peer);
+  });
+  voice.remotes.forEach((r, pid) => {
+    if (have.has(pid) || !r.media.getAudioTracks().length) return;
+    const a = document.createElement('audio');
+    a.autoplay = true; a.dataset.peer = pid; a.srcObject = r.media;
+    a.play().catch(() => {});
+    sink.appendChild(a);
+  });
+}
+function tileEl(peerId, gh, name, avatar, media, kind, isLocal) {
+  const d = document.createElement('div');
+  d.className = 'tile' + (kind === 'screen' ? ' screen' : '') + (isLocal ? ' mine' : '');
+  d.dataset.peer = peerId;
+  const hasVideo = media && media.getVideoTracks().length > 0;
+  if (hasVideo) {
+    const v = document.createElement('video');
+    v.autoplay = true; v.playsInline = true;
+    v.className = kind === 'screen' ? 'screenv' : 'camv';
+    if (isLocal) v.muted = true;
+    v.srcObject = media;
+    const playIt = () => { v.play().catch(() => showBlocked(d, v)); };
+    v.onloadedmetadata = playIt;
+    playIt();
+    d.appendChild(v);
+    d.classList.add('has-video');
+  } else {
+    const av = document.createElement('div'); av.className = 'tav';
+    const img = document.createElement('img');
+    img.src = avatar || ghPng(gh); img.onerror = () => avatarFallback(img, gh);
+    av.appendChild(img); d.appendChild(av);
+  }
+  const nm = document.createElement('div');
+  nm.className = 'tname';
+  nm.textContent = (isLocal ? name + ' (you)' : name) + (kind === 'screen' ? ' 🖥️' : '');
+  d.appendChild(nm);
+  if (voice && voice.speaking.get(peerId)) d.classList.add('speaking');
+  return d;
+}
+function showBlocked(tile, mediaEl) {
+  if (tile.querySelector('.blocked')) return;
+  const o = document.createElement('div');
+  o.className = 'blocked';
+  o.textContent = '🔇 Click to enable sound';
+  o.onclick = ev => { ev.stopPropagation(); mediaEl.play().then(() => o.remove()).catch(() => {}); };
+  tile.appendChild(o);
+}
+function remoteVideoKind(v, pid) {
+  const r = v.remotes.get(pid);
+  if (!r || !r.media.getVideoTracks().length) return null;
+  return r.kind || 'cam';
+}
+function renderTiles() {
+  if (!voice) return;
+  renderStageTiles();
+  renderCallTiles();
+  ensureAudioSink();
+  syncMediaButtons();
+}
+// VC stage: alag UI — sirf video/screen ho tabhi strip
+function renderStageTiles() {
+  const v = voice;
+  if (!v || v.isCall) {
+    const st0 = $('vcStage');
+    if (st0) { st0.innerHTML = ''; st0.classList.remove('show'); }
+    return;
+  }
+  const pids = [...v.remotes.keys()];
+  const stage = $('vcStage');
+  stage.innerHTML = '';
+  const showStage = v.camOn || v.sharing || pids.some(pid => remoteVideoKind(v, pid));
+  if (showStage) {
+    stage.classList.add('show');
+    if (v.camOn || v.sharing) stage.appendChild(tileEl('self', me.gh, me.name, me.avatar, v.localStream, v.sharing ? 'screen' : 'cam', true));
+    pids.forEach(pid => {
+      const kind = remoteVideoKind(v, pid);
+      if (!kind) return;
+      const p = peerProf(v, pid);
+      stage.appendChild(tileEl(pid, p.gh, p.name, p.avatar, v.remotes.get(pid).media, kind, false));
+    });
+  } else stage.classList.remove('show');
+}
+// Call modal: alag UI — remote bada, local PiP
+function renderCallTiles() {
+  const v = voice;
+  if (!v || !v.isCall || !$('callModal').classList.contains('show')) return;
+  const ct = $('callTiles');
+  ct.innerHTML = '';
+  const pids = [...v.remotes.keys()];
+  // main = screen > video > pehla audio
+  let mainPid = pids.find(pid => remoteVideoKind(v, pid) === 'screen')
+    || pids.find(pid => remoteVideoKind(v, pid))
+    || pids[0] || null;
+  const selfTile = tileEl('self', me.gh, me.name, me.avatar, (v.camOn || v.sharing) ? v.localStream : null, v.sharing ? 'screen' : 'cam', true);
+  pids.forEach(pid => {
+    const p = peerProf(v, pid);
+    const kind = remoteVideoKind(v, pid) || 'audio';
+    const t = tileEl(pid, p.gh, p.name, p.avatar, v.remotes.get(pid).media, kind, false);
+    if (pid === mainPid) t.classList.add('main');
+    ct.appendChild(t);
+  });
+  // local hamesha PiP jab remote video/screen ho
+  if (mainPid && remoteVideoKind(v, mainPid)) selfTile.classList.add('pip');
+  ct.appendChild(selfTile);
+}
+function syncMediaButtons() {
+  if (!voice) return;
+  [['vcMuteBtn', voice.muted, '🎙️', '🔇'], ['callMuteBtn', voice.muted, '🎙️', '🔇']].forEach(([id, off, on, offIc]) => {
+    const b = $(id);
+    if (!b) return;
+    b.classList.toggle('off', !!off);
+    b.childNodes[0].textContent = off ? offIc : on;
+  });
+  [['vcCamBtn', voice.camOn], ['callCamBtn', voice.camOn]].forEach(([id, on]) => {
+    const b = $(id);
+    if (b) b.classList.toggle('on', !!on);
+  });
+  [['vcScreenBtn', voice.sharing], ['callScreenBtn', voice.sharing]].forEach(([id, on]) => {
+    const b = $(id);
+    if (b) b.classList.toggle('on', !!on);
+  });
+}
+
+// ---------- global VC ----------
+function vcConvo() { return ensureConvo('vc', 'global'); }
+async function joinVC() {
+  if (voice && !voice.isCall) return leaveVC();
+  if (voice && voice.isCall) { sysMsg('⚠ Pehle call end karo'); return; }
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch { sysMsg('⚠ Mic nahi mila — permission do'); return; }
+  const cv = vcConvo();
+  ensureRoom(cv);
+  voice = { cv, isCall: false, localStream: stream, remotes: new Map(), analysers: new Map(), speaking: new Map(), muted: false, camOn: false, sharing: false, camTrack: null, screenTrack: null };
+  startVoiceIO(voice);
+  renderVoiceUI();
+  sysMsg('🎙️ Global VC join kiya');
+}
+function leaveVC() {
+  if (!voice || voice.isCall) return;
+  stopVoice();
+  sysMsg('Global VC chhod diya');
+}
+function stopVoice() {
+  const v = voice;
+  voice = null;
+  callState = null;
+  stopRing();
+  if (callTimer) { clearInterval(callTimer); callTimer = null; }
+  try { v && v.localStream.getTracks().forEach(t => { try { t.stop(); } catch {} }); } catch {}
+  try { v && v.camTrack && v.camTrack.stop(); } catch {}
+  try { v && v.screenTrack && v.screenTrack.stop(); } catch {}
+  if (v && v.cv) {
+    try { v.cv.room && v.cv.room.leave(); } catch {}
+    v.cv.room = null; v.cv.acts = {}; v.cv.peers.clear(); v.cv.typing.clear();
+    if (v.cv.announceTimer) { clearInterval(v.cv.announceTimer); v.cv.announceTimer = null; }
+  }
+  const st = $('vcStage');
+  if (st) { st.innerHTML = ''; st.classList.remove('show'); }
+  const ct = $('callTiles');
+  if (ct) ct.innerHTML = '';
+  closeCallModal();
+  ensureAudioSink();
+  renderVoiceUI();
+}
+function renderVoiceUI() {
+  const box = $('voiceList');
+  if (box) {
+    box.innerHTML = '';
+    const row = document.createElement('button');
+    const joined = voice && !voice.isCall;
+    row.className = 'vc-row' + (joined ? ' active' : '');
+    const ic = document.createElement('span'); ic.className = 'vol'; ic.textContent = '🔊';
+    const nm = document.createElement('span'); nm.textContent = ' Global VC';
+    const cnt = document.createElement('span'); cnt.className = 'cnt';
+    const vc = [...convos.values()].find(c => c.kind === 'vc');
+    const uniqVc = new Set();
+    if (vc) vc.peers.forEach(p => uniqVc.add(String(p.gh).toLowerCase()));
+    if (voice && !voice.isCall && me) uniqVc.add(String(me.gh).toLowerCase());
+    const n = uniqVc.size;
+    cnt.textContent = n ? n + ' online' : '';
+    row.append(ic, nm, cnt);
+    row.onclick = () => joinVC();
+    box.appendChild(row);
+    if (vc && (vc.peers.size || (voice && !voice.isCall))) {
+      const mems = document.createElement('div');
+      mems.className = 'vc-mems';
+      if (voice && !voice.isCall) mems.appendChild(vcMemRow('self', me.gh, me.name, me.avatar, voice.muted, false));
+      const vcSeen = new Set([String(me.gh).toLowerCase()]);
+      [...vc.peers.entries()].forEach(([pid, p]) => {
+        const low = String(p.gh).toLowerCase();
+        if (vcSeen.has(low)) return;
+        vcSeen.add(low);
+        mems.appendChild(vcMemRow(pid, p.gh, p.name || p.gh, p.avatar || '', false, true));
+      });
+      box.appendChild(mems);
+    }
+  }
+  const panel = $('vcPanel');
+  if (panel) {
+    if (voice && !voice.isCall) {
+      panel.classList.add('show');
+      const uniqPanel = new Set([String(me.gh).toLowerCase()]);
+      voice.cv.peers.forEach(p => uniqPanel.add(String(p.gh).toLowerCase()));
+      $('vcLabel').textContent = 'Global VC • ' + uniqPanel.size;
+    } else panel.classList.remove('show');
+  }
+  syncMediaButtons();
+}
+function vcMemRow(pid, gh, name, avatar, muted, remote) {
+  const row = document.createElement('div');
+  row.className = 'vc-mem';
+  row.dataset.peer = pid;
+  const img = document.createElement('img');
+  img.src = avatar || ghPng(gh); img.onerror = () => avatarFallback(img, gh);
+  const nm = document.createElement('span');
+  nm.textContent = name + (muted ? ' 🔇' : '');
+  nm.style.flex = '1';
+  row.append(img, nm);
+  if (voice && voice.speaking.get(pid)) row.classList.add('speaking');
+  return row;
+}
+// media controls (VC + call dono)
+function toggleMute() {
+  if (!voice) return;
+  voice.muted = !voice.muted;
+  try { voice.localStream.getAudioTracks().forEach(t => { t.enabled = !voice.muted; }); } catch {}
+  syncMediaButtons();
+  renderVoiceUI();
+}
+async function toggleCam() {
+  if (!voice) return;
+  const v = voice;
+  if (v.camOn) {
+    try { v.camTrack && v.cv.room.removeTrack(v.camTrack); } catch {}
+    try { v.camTrack && v.camTrack.stop(); } catch {}
+    try { v.localStream.getVideoTracks().forEach(t => { if (t !== v.screenTrack) { v.localStream.removeTrack(t); try { t.stop(); } catch {} } }); } catch {}
+    v.camTrack = null; v.camOn = false;
+    renderTiles(); return;
+  }
+  try {
+    const vs = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 } } });
+    const track = vs.getVideoTracks()[0];
+    if (!track) throw 0;
+    v.camTrack = track;
+    try { v.localStream.addTrack(track); } catch {}
+    try { v.cv.room.addTrack(track, v.localStream); } catch {}
+    v.camOn = true;
+    renderTiles();
+  } catch { sysMsg('⚠ Camera nahi mila'); }
+}
+async function toggleScreen() {
+  if (!voice) return;
+  const v = voice;
+  if (v.sharing) {
+    try { v.screenTrack && v.cv.room.removeTrack(v.screenTrack); } catch {}
+    try { v.screenTrack && v.screenTrack.stop(); } catch {}
+    try { v.localStream.getTracks().forEach(t => { if (t === v.screenTrack) v.localStream.removeTrack(t); }); } catch {}
+    v.screenTrack = null; v.sharing = false;
+    renderTiles(); return;
+  }
+  try {
+    const ss = await navigator.mediaDevices.getDisplayMedia({ video: true });
+    const track = ss.getVideoTracks()[0];
+    if (!track) throw 0;
+    v.screenTrack = track;
+    try { v.localStream.addTrack(track); } catch {}
+    try { v.cv.room.addTrack(track, v.localStream, { metadata: { kind: 'screen' } }); } catch {}
+    v.sharing = true;
+    track.onended = () => { if (voice === v && v.sharing) toggleScreen(); };
+    renderTiles();
+  } catch {}
+}
+function hangUp() {
+  if (!voice) return;
+  const v = voice;
+  if (v.isCall && v.peerGh) sendCallSignal(v.peerGh, { kind: 'end', callId: v.callId });
+  stopVoice();
+}
+
+// ---------- 1-to-1 calls ----------
+function sendCallSignal(gh, payload) {
+  const gc = convos.get('channel:global');
+  if (!gc || !gc.room || !gc.acts.call) return false;
+  const pid = peerIdOf(gh, gc);
+  if (!pid) return false;
+  try {
+    handleFor(gc, () => { callAct.send({ ...payload, to: gh, from: { gh: me.gh, name: me.name, avatar: me.avatar } }, { target: pid }); });
+    return true;
+  } catch { return false; }
+}
+function startCall(gh, video) {
+  if (!me || !gh) return;
+  gh = String(gh).replace(/^@/, '');
+  if (gh.toLowerCase() === String(me.gh).toLowerCase()) return;
+  if (voice || callState) { sysMsg('⚠ Pehle current voice/call chhodo'); return; }
+  const gc = convos.get('channel:global');
+  if (!gc || !gc.room || !gc.acts.call || !peerIdOf(gh, gc)) {
+    sysMsg('⚠ @' + gh + ' call ke liye online nahi hai');
+    return;
+  }
+  const callId = (selfId || 'c').slice(0, 8) + '-' + Date.now().toString(36);
+  callState = { callId, peerGh: gh, video: !!video, dir: 'out', peerProfile: findProfile(gh) };
+  showCallModal('outgoing');
+  sendCallSignal(gh, { kind: 'offer', callId, video: !!video });
+}
+function callCurrent(video) {
+  if (!cur || cur.kind !== 'dm') return;
+  startCall(dmProfile(cur).gh, video);
+}
+function startRing() {
+  stopRing();
+  try {
+    ringCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ringCtx.createOscillator();
+    const g = ringCtx.createGain();
+    g.gain.value = 0.12;
+    o.frequency.value = 440;
+    o.connect(g); g.connect(ringCtx.destination);
+    o.start();
+    ringOsc = o;
+    let on = true;
+    ringTimer = setInterval(() => { on = !on; try { g.gain.value = on ? 0.12 : 0; } catch {} }, 450);
+  } catch {}
+}
+function stopRing() {
+  if (ringTimer) { clearInterval(ringTimer); ringTimer = null; }
+  if (ringOsc) { try { ringOsc.stop(); } catch {} ringOsc = null; }
+  if (ringCtx) { try { ringCtx.close(); } catch {} ringCtx = null; }
+}
+// inline onclick handlers module scope me hain — window par expose karo
+window.toggleMute = toggleMute;
+window.toggleCam = toggleCam;
+window.toggleScreen = toggleScreen;
+window.hangUp = hangUp;
+window.acceptCall = acceptCall;
+window.rejectCall = rejectCall;
+window.cancelCall = cancelCall;
+window.callCurrent = callCurrent;
+window.joinVC = joinVC;
+window.startCall = startCall;
+function showCallModal(mode) {
+  const m = $('callModal');
+  m.classList.add('show');
+  $('callCtrlRing').style.display = mode === 'incoming' ? '' : 'none';
+  $('callCtrlOut').style.display = mode === 'outgoing' ? '' : 'none';
+  $('callCtrlIn').style.display = mode === 'active' ? '' : 'none';
+  const cs = callState;
+  const prof = (cs && (cs.peerProfile || findProfile(cs.peerGh))) || { name: '', gh: '' };
+  const av = $('callAvatar');
+  if (mode === 'active') av.style.display = 'none';
+  else {
+    av.style.display = '';
+    av.src = prof.avatar || ghPng(prof.gh || '');
+    av.onerror = () => avatarFallback(av, prof.gh || '');
+  }
+  $('callTitle').textContent = mode === 'incoming' ? 'Incoming call' : mode === 'outgoing' ? 'Calling…' : '@' + (prof.gh || '');
+  $('callSub').textContent = mode === 'incoming'
+    ? '@' + (prof.gh || '') + ' tumhe bula raha hai' + (cs && cs.video ? ' (video)' : '')
+    : mode === 'outgoing' ? '@' + (prof.gh || '') + '…' : 'Connected';
+  $('callTimer').style.display = mode === 'active' ? '' : 'none';
+  $('callAvatar').classList.toggle('ringing', mode === 'incoming' || mode === 'outgoing');
+  if (mode === 'active' && voice) renderTiles();
+}
+function closeCallModal() {
+  $('callModal').classList.remove('show');
+  stopRing();
+  if (callTimer) { clearInterval(callTimer); callTimer = null; }
+}
+function tickCall() {
+  callSec++;
+  const mm = String(Math.floor(callSec / 60)).padStart(2, '0');
+  const ss = String(callSec % 60).padStart(2, '0');
+  const t = mm + ':' + ss;
+  const ct = $('callTimer');
+  if (ct) ct.textContent = t;
+  const cs = $('callSub');
+  if (cs) cs.textContent = 'Connected • ' + t;
+}
+async function joinCallRoom(cs) {
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: cs.video ? { width: { ideal: 640 } } : false });
+  } catch { sysMsg('⚠ Mic/camera nahi mila'); endCallUI('Mic nahi mila'); return; }
+  const cv = ensureConvo('call', cs.callId);
+  ensureRoom(cv);
+  voice = {
+    cv, isCall: true, callId: cs.callId, peerGh: cs.peerGh,
+    localStream: stream, remotes: new Map(), analysers: new Map(), speaking: new Map(),
+    muted: false, camOn: !!cs.video, sharing: false,
+    camTrack: cs.video ? (stream.getVideoTracks()[0] || null) : null, screenTrack: null,
+  };
+  startVoiceIO(voice);
+  callSec = 0;
+  if (callTimer) clearInterval(callTimer);
+  callTimer = setInterval(tickCall, 1000);
+  showCallModal('active');
+  renderVoiceUI();
+}
+function acceptCall() {
+  if (!callState || callState.dir !== 'in') return;
+  stopRing();
+  const cs = callState;
+  sendCallSignal(cs.peerGh, { kind: 'accept', callId: cs.callId });
+  closeProfile();
+  joinCallRoom(cs);
+}
+function rejectCall() {
+  if (!callState) return;
+  sendCallSignal(callState.peerGh, { kind: 'reject', callId: callState.callId });
+  callState = null;
+  closeCallModal();
+}
+function cancelCall() {
+  if (!callState) return;
+  sendCallSignal(callState.peerGh, { kind: 'end', callId: callState.callId });
+  callState = null;
+  closeCallModal();
+}
+function endCallUI(note) {
+  stopRing();
+  callState = null;
+  closeCallModal();
+  if (note) sysMsg(note);
+}
+function remoteHungUp() {
+  if (!voice || !voice.isCall) return;
+  const gh = voice.peerGh;
+  stopVoice();
+  sysMsg('📞 @' + gh + ' ne call end ki');
+}
+function setupCallSignal(cv, ca) {
+  ca.onMessage = (d) => {
+    if (!d || !d.kind || !me) return;
+    const fromGh = d.from && d.from.gh ? String(d.from.gh) : null;
+    if (d.kind === 'offer') {
+      if (!fromGh || String(d.to || '').toLowerCase() !== String(me.gh).toLowerCase()) return;
+      rememberUser({ gh: fromGh, name: d.from.name || fromGh, avatar: d.from.avatar || '' });
+      if (voice || callState) {
+        const gc = convos.get('channel:global');
+        const pid = gc ? peerIdOf(fromGh, gc) : null;
+        if (gc && gc.room && gc.acts.call && pid) {
+          try { handleFor(gc, () => { callAct.send({ kind: 'busy', callId: d.callId, to: fromGh, from: { gh: me.gh } }, { target: pid }); }); } catch {}
+        }
+        return;
+      }
+      callState = { callId: String(d.callId), peerGh: fromGh, video: !!d.video, dir: 'in', peerProfile: { gh: fromGh, name: (d.from && d.from.name) || fromGh, avatar: (d.from && d.from.avatar) || '' } };
+      closeProfile();
+      showCallModal('incoming');
+      startRing();
+    } else if (!callState || String(d.callId || '') !== String(callState.callId)) {
+      return;
+    } else if (d.kind === 'accept' && callState.dir === 'out') {
+      joinCallRoom(callState);
+    } else if (d.kind === 'reject' && callState.dir === 'out') {
+      endCallUI('📞 @' + callState.peerGh + ' ne call decline ki');
+    } else if (d.kind === 'busy' && callState.dir === 'out') {
+      endCallUI('📞 @' + callState.peerGh + ' busy hai');
+    } else if (d.kind === 'end') {
+      if (voice && voice.isCall) remoteHungUp();
+      else endCallUI();
+    }
+  };
+}
+
+// ---- files: pehle textbox me stage, Send par chat me (WebRTC P2P, max 15MB) ----
+window.attachFile = function () { $('fileInput').click(); };
+$('fileInput').addEventListener('change', () => {
+  const files = [...$('fileInput').files];
+  $('fileInput').value = '';
+  files.forEach(f => {
+    if (staged.length >= 5) { sysMsg('⚠ Ek saath max 5 files'); return; }
+    if (f.size > MAX_FILE) { sysMsg('⚠ "' + f.name + '" 15MB se bada hai'); return; }
+    if (!f.size) return;
+    staged.push({ id: 'st' + Date.now() + Math.random().toString(36).slice(2, 6), file: f, url: URL.createObjectURL(f) });
+  });
+  renderStage();
+  $('messageInput').focus();
+});
+function renderStage() {
+  const bar = $('stageBar');
+  bar.innerHTML = '';
+  bar.classList.toggle('show', staged.length > 0);
+  staged.forEach(s => {
+    const d = document.createElement('div');
+    d.className = 'staged';
+    d.title = s.file.name || 'file';
+    if ((s.file.type || '').startsWith('image/')) {
+      const img = document.createElement('img');
+      img.src = s.url; img.alt = '';
+      d.appendChild(img);
+    } else {
+      const ic = document.createElement('span');
+      ic.className = 'sdoc'; ic.textContent = '📄';
+      d.appendChild(ic);
+    }
+    const x = document.createElement('button');
+    x.textContent = '✕'; x.title = 'Hatao';
+    x.onclick = () => {
+      staged = staged.filter(v => v.id !== s.id);
+      try { URL.revokeObjectURL(s.url); } catch {}
+      renderStage();
+    };
+    d.appendChild(x);
+    bar.appendChild(d);
+  });
+}
+async function sendFile(file, caption, replyObj) {
+  if (!room || !me || !file) return;
+  if (file.size > MAX_FILE) { sysMsg('⚠ "' + file.name + '" 15MB se bada hai — nahi bheja gaya'); return; }
+  if (file.size === 0) { sysMsg('⚠ Khali file nahi bhej sakte'); return; }
+  const id = 'file-' + selfId + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+  const cap = esc(caption || '').slice(0, 1000);
+  const meta = { id, gh: me.gh, name: me.name, avatar: me.avatar, ts: Date.now(), fname: (file.name || 'file').slice(0, 120), ftype: file.type || 'application/octet-stream', fsize: file.size, cap };
+  if (replyObj) meta.reply = replyObj;
+  const msg = { id, gh: me.gh, name: me.name, avatar: me.avatar, text: cap, ts: meta.ts, reply: replyObj || null, file: { name: meta.fname, type: meta.ftype, size: meta.fsize, url: URL.createObjectURL(file), progress: 0 } };
+  seenIds.add(id); cachedMsgs.push(msg); msgById.set(id, msg); saveCache();
+  renderMessage(msg);
+  try {
+    const buf = await file.arrayBuffer();
+    await fileAct.send(buf, { metadata: meta, onProgress: p => updateFileProgress(id, p) });
+    updateFileProgress(id, 1);
+  } catch { sysMsg('⚠ File send fail: ' + meta.fname); }
+}
+function updateFileProgress(id, p) {
+  const m = msgById.get(id);
+  if (m && m.file) { m.file.progress = p; if (p >= 1) delete m.file.progress; }
+  const row = document.querySelector('[data-msgid="' + CSS.escape(id) + '"]');
+  if (!row || !m) return;
+  if (p >= 1) {
+    const old = row.querySelector('.attach');
+    if (old) old.replaceWith(renderAttach(m));
+    return;
+  }
+  const fill = row.querySelector('.fprog i');
+  if (fill) fill.style.width = Math.round(p * 100) + '%';
+}
+function renderAttach(m) {
+  const f = m.file || {};
+  const isImg = f.type && f.type.startsWith('image/');
+  const wrap = document.createElement('div');
+  wrap.className = 'attach';
+  if (isImg) {
+    // images: sirf preview, na filename na download button
+    if (f.url) {
+      const img = document.createElement('img');
+      img.className = 'attach-img'; img.src = f.url; img.alt = '';
+      img.onclick = () => window.open(f.url, '_blank');
+      wrap.appendChild(img);
+    } else {
+      const ph = document.createElement('div');
+      ph.className = 'file-card';
+      const ic = document.createElement('span'); ic.className = 'fic'; ic.textContent = '🖼️';
+      const info = document.createElement('div'); info.className = 'fin';
+      const sz = document.createElement('div'); sz.className = 'fsz'; sz.textContent = 'photo • expired';
+      info.appendChild(sz);
+      ph.append(ic, info);
+      wrap.appendChild(ph);
+    }
+  } else {
+  const card = document.createElement('div');
+  card.className = 'file-card';
+  const ic = document.createElement('span');
+  ic.className = 'fic';
+  ic.textContent = f.type && f.type.startsWith('image/') ? '🖼️' : f.type && f.type.startsWith('video/') ? '🎬' : f.type && f.type.startsWith('audio/') ? '🎵' : '📄';
+  const info = document.createElement('div');
+  info.className = 'fin';
+  const nm = document.createElement('div'); nm.className = 'fnm'; nm.textContent = f.name || 'file';
+  const sz = document.createElement('div'); sz.className = 'fsz'; sz.textContent = fmtSize(f.size);
+  info.append(nm, sz);
+  card.append(ic, info);
+  if (f.url) {
+    const a = document.createElement('a');
+    a.className = 'fdown'; a.href = f.url; a.download = f.name || 'file'; a.textContent = '⬇ Download';
+    card.appendChild(a);
+  } else {
+    const s = document.createElement('span'); s.className = 'fexp'; s.textContent = 'expired';
+    card.appendChild(s);
+  }
+  wrap.appendChild(card);
+  }
+  if (f.progress != null && f.progress < 1) {
+    const bar = document.createElement('div'); bar.className = 'fprog';
+    const fill = document.createElement('i'); fill.style.width = Math.round(f.progress * 100) + '%';
+    bar.appendChild(fill); wrap.appendChild(bar);
+  }
+  return wrap;
+}
+
+// ---- in-app profile (GitHub khulne ke bajaye yahi card) ----
+function findProfile(gh) {
+  if (!gh) return { gh: '?', name: '?', avatar: '' };
+  const low = String(gh).toLowerCase();
+  if (me && String(me.gh).toLowerCase() === low) return { gh: me.gh, name: me.name, avatar: me.avatar, bio: me.bio || '', you: true };
+  for (const cv of convos.values()) {
+    for (const p of cv.peers.values()) {
+      if (String(p.gh).toLowerCase() === low) return { gh: p.gh, name: p.name || p.gh, avatar: p.avatar || '' };
+    }
+    const msgs = cv.store.msgs.filter(m => m.gh && String(m.gh).toLowerCase() === low);
+    if (msgs.length) {
+      const m = msgs[msgs.length - 1];
+      return { gh: m.gh, name: m.name || m.gh, avatar: m.avatar || '' };
+    }
+  }
+  return { gh, name: gh, avatar: '' };
+}
+function openProfile(gh) {
+  if (!gh) return;
+  const u = findProfile(gh);
+  const av = $('pfAvatar');
+  av.src = u.avatar || ghPng(gh);
+  av.onerror = () => avatarFallback(av, gh);
+  $('pfName').textContent = u.name || gh;
+  $('pfUser').textContent = '@' + gh;
+  $('pfBio').textContent = u.bio || '';
+  $('pfBio').style.display = u.bio ? 'block' : 'none';
+  const n = cachedMsgs.filter(m => m.gh === gh).length;
+  const where = cur && cur.kind === 'dm' ? 'in DM' : 'in #' + channelId;
+  $('pfStats').textContent = n + (n === 1 ? ' message' : ' messages') + ' ' + where + (u.you ? ' • this is you' : '');
+  const lowGh = String(gh).toLowerCase();
+  const selfGh = me && lowGh === String(me.gh).toLowerCase();
+  $('pfAdd').style.display = (selfGh || isFriend(gh)) ? 'none' : '';
+  $('pfAdd').textContent = reqOut.has(lowGh) ? '✓ Sent' : '➕ Add Friend';
+  $('pfAdd').onclick = () => { sendFriendReq(gh); $('pfAdd').textContent = '✓ Sent'; };
+  $('pfDM').style.display = u.you ? 'none' : '';
+  $('pfDM').onclick = () => openDM(gh);
+  $('pfCall').style.display = u.you ? 'none' : '';
+  $('pfCall').onclick = () => { closeProfile(); startCall(gh, false); };  $('pfMention').onclick = () => {
+    const inp = $('messageInput');
+    inp.value = (inp.value ? inp.value.replace(/\s+$/, '') + ' ' : '') + '@' + gh + ' ';
+    inp.focus();
+    closeProfile();
+  };
+  $('pfGithub').onclick = () => window.open('https://github.com/' + encodeURIComponent(gh), '_blank');
+  $('profileModal').classList.add('show');
+}
+function closeProfile() {
+  $('profileModal').classList.remove('show');
+}
+$('profileModal').addEventListener('click', e => {
+  if (e.target.id === 'profileModal') closeProfile();
+});
+
+// ---- GIF picker (Tenor — free API key ek baar ⚙️ me dalni hai) ----
+const tenorKey = () => { try { return localStorage.getItem('tenor-key') || ''; } catch { return ''; } };
+function tenorSetupHTML() {
+  return '<div class="gif-setup"><b>🎬 GIFs ke liye free Tenor key chahiye (ek baar)</b>' +
+    '<ol><li><a href="https://developers.google.com/tenor/guides/quickstart" target="_blank" rel="noopener">Quickstart</a> se Google Cloud me Tenor API enable karke key banao (free)</li>' +
+    '<li>Upar ⚙️ dabao, key dalo, Save karo</li></ol></div>';
+}
+let gifT = null, gifLoaded = false;
+window.toggleGif = function (e) {
+  if (e) e.stopPropagation();
+  const gp = $('gifPicker');
+  if (gp.classList.contains('show')) { closeGif(); return; }
+  closePicker();
+  placePicker($('inputBox').getBoundingClientRect(), 'right', gp);
+  if (!gifLoaded) { gifLoaded = true; loadGifs(''); }
+};
+function closeGif() {
+  const gp = $('gifPicker');
+  if (gp) gp.classList.remove('show');
+}
+window.closeGif = closeGif;
+$('gifClose').onclick = e => { e.stopPropagation(); closeGif(); };
+$('gifKeyBtn').onclick = e => {
+  e.stopPropagation();
+  const row = $('gifKeyRow');
+  row.classList.toggle('show');
+  $('gifKey').value = tenorKey();
+};
+$('gifKeySave').onclick = () => {
+  const v = $('gifKey').value.trim();
+  try {
+    if (v) localStorage.setItem('tenor-key', v);
+    else localStorage.removeItem('tenor-key');
+  } catch {}
+  $('gifKeyRow').classList.remove('show');
+  gifLoaded = false;
+  loadGifs($('gifSearch').value.trim());
+};
+$('gifSearch').addEventListener('input', () => {
+  clearTimeout(gifT);
+  gifT = setTimeout(() => loadGifs($('gifSearch').value.trim()), 500);
+});
+async function loadGifs(q) {
+  const grid = $('gifGrid');
+  if (!tenorKey()) {
+    grid.innerHTML = '';
+    const d = document.createElement('div');
+    d.innerHTML = tenorSetupHTML();
+    d.querySelector('a').style.color = 'var(--blurple)';
+    grid.appendChild(d);
+    return;
+  }
+  grid.innerHTML = '<div class="gif-status">Loading…</div>';
+  try {
+    const params = new URLSearchParams({
+      key: tenorKey(), client_key: 'webrtc-global-chat', limit: '24',
+      media_filter: 'gif,tinygif', contentfilter: 'medium',
+    });
+    if (q) params.set('q', q);
+    const url = 'https://tenor.googleapis.com/v2/' + (q ? 'search' : 'featured') + '?' + params.toString();
+    const res = await fetch(url);
+    if (res.status === 401 || res.status === 403) {
+      grid.innerHTML = '<div class="gif-status">Key galat/blocked hai — ⚙️ me sahi Tenor key dalo</div>';
+      return;
+    }
+    if (!res.ok) throw new Error('net');
+    const j = await res.json();
+    grid.innerHTML = '';
+    (j.results || []).forEach(g => {
+      const mf = g.media_formats || {};
+      const full = (mf.gif && mf.gif.url) || (mf.mediumgif && mf.mediumgif.url);
+      const thumb = (mf.tinygif && mf.tinygif.url) || full;
+      if (!full) return;
+      const b = document.createElement('button');
+      b.className = 'gif-item';
+      b.title = g.content_description || 'GIF';
+      const img = document.createElement('img');
+      img.src = thumb; img.loading = 'lazy'; img.alt = '';
+      b.appendChild(img);
+      b.onclick = ev => { ev.stopPropagation(); sendGif(full); };
+      grid.appendChild(b);
+    });
+    if (!grid.childElementCount) grid.innerHTML = '<div class="gif-status">Kuch nahi mila</div>';
+  } catch {
+    grid.innerHTML = '<div class="gif-status">GIF load nahi hue — net ya key check karo</div>';
+  }
+}
+async function sendGif(url) {
+  closeGif();
+  if (!room || !me) return;
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const file = new File([blob], 'gif-' + Date.now() + '.gif', { type: blob.type || 'image/gif' });
+    if (file.size > MAX_FILE) { sysMsg('⚠ GIF bahut bada hai'); return; }
+    staged.push({ id: 'st' + Date.now() + Math.random().toString(36).slice(2, 6), file, url: URL.createObjectURL(file) });
+    renderStage();
+    $('messageInput').focus();
+    sysMsg('GIF ready hai — Send dabao');
+  } catch { sysMsg('⚠ GIF download fail'); }
+}
+
+// ---- emotes: 7TV + BTTV + FFZ global sets ----
+let sevenMap = {};
+let sevenById = {};
+let bttvById = {};
+let ffzById = {};
+let sevenList = [];
+let sevenLoaded = false;
+const emoteMaps = () => ({ '7tv': sevenById, 'bttv': bttvById, 'ffz': ffzById });
+const seenEmoteIds = new Set();
+function addEmote(provider, id, name, url) {
+  if (!name || !url || !id) return false;
+  const k = provider + ':' + id;
+  if (seenEmoteIds.has(k)) return false;
+  seenEmoteIds.add(k);
+  const maps = { '7tv': sevenById, 'bttv': bttvById, 'ffz': ffzById };
+  maps[provider][String(id)] = { name, url };
+  sevenList.push({ provider, id: String(id), name, url });
+  if (!sevenMap[name]) sevenMap[name] = { id: String(id), url, provider };
+  return true;
+}
+// poora 7TV catalog search (global set ke bahar bhi)
+let sevenQT = null, sevenQToken = null;
+async function searchSevenTV(q) {
+  q = (q || '').trim();
+  if (q.length < 2) return;
+  const token = sevenQToken = {};
+  try {
+    const res = await fetch('https://7tv.io/v3/gql', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: 'query($q:String!,$l:Int){emotes(query:$q,limit:$l){items{id name host{url files{name format}}}}}',
+        variables: { q, l: 20 },
+      }),
+    });
+    if (!res.ok) throw 0;
+    const j = await res.json();
+    const items = (((j || {}).data || {}).emotes || {}).items || [];
+    if (token !== sevenQToken) return;
+    let added = 0;
+    items.forEach(e => {
+      const host = e.host;
+      const files = (host && host.files) || [];
+      const f = files.find(x => x.format === 'WEBP') || files.find(x => x.format === 'AVIF') || files.find(x => x.format === 'GIF') || files[0];
+      if (!host || !f || !e.name) return;
+      if (addEmote('7tv', e.id, e.name, 'https:' + host.url + '/' + f.name)) added++;
+    });
+    if (added) buildSeven($('sevenSearch').value || '');
+  } catch {}
+}
+async function loadSevenTV() {
+  const jobs = [
+    // 7TV global: https://7tv.io/v3/emote-sets/global
+    (async () => {
+      const res = await fetch('https://7tv.io/v3/emote-sets/global');
+      if (!res.ok) throw 0;
+      const j = await res.json();
+      (j.emotes || []).forEach(e => {
+        const host = e.data && e.data.host;
+        const files = (host && host.files) || [];
+        const f = files.find(x => x.format === 'WEBP') || files.find(x => x.format === 'AVIF') || files.find(x => x.format === 'GIF') || files[0];
+        if (!host || !f || !e.name) return;
+        addEmote('7tv', e.id, e.name, 'https:' + host.url + '/' + f.name);
+      });
+    })(),
+    // BTTV global: https://api.betterttv.net/3/cached/emotes/global
+    (async () => {
+      const res = await fetch('https://api.betterttv.net/3/cached/emotes/global');
+      if (!res.ok) throw 0;
+      const arr = await res.json();
+      (Array.isArray(arr) ? arr : []).forEach(e => {
+        if (!e || !e.code || !e.id) return;
+        addEmote('bttv', e.id, e.code, 'https://cdn.betterttv.net/emote/' + e.id + '/2x.' + (e.imageType || 'gif'));
+      });
+    })(),
+    // FFZ global set
+    (async () => {
+      const res = await fetch('https://api.frankerfacez.com/v1/set/global');
+      if (!res.ok) throw 0;
+      const j = await res.json();
+      Object.values((j && j.sets) || {}).forEach(set => {
+        ((set && set.emoticons) || []).forEach(e => {
+          const urls = e.urls || {};
+          const u = urls['4'] || urls['2'] || urls['1'];
+          if (!e || !e.name || !u) return;
+          addEmote('ffz', e.id, e.name, u.startsWith('//') ? 'https:' + u : u);
+        });
+      });
+    })(),
+  ];
+  await Promise.allSettled(jobs);
+  sevenList.sort((a, b) => a.name.localeCompare(b.name));
+  sevenLoaded = true;
+  buildSeven($('sevenSearch').value || '');
+  // pehle aaye text-emotes ko images me badlo
+  if (cur && $('messages').childElementCount) {
+    $('messages').innerHTML = '';
+    cur.store.msgs.forEach(m => renderMessage(m));
+  }
+}
+function sevenURL(id) {
+  const e = sevenById[id];
+  return e ? e.url : null;
+}
+function buildSeven(filter) {
+  const grid = $('sevenGrid');
+  if (!grid) return;
+  filter = (filter || '').trim().toLowerCase();
+  grid.innerHTML = '';
+  if (!sevenLoaded) {
+    grid.innerHTML = '<div class="gif-status">Loading 7TV…</div>';
+    return;
+  }
+  const list = sevenList.filter(e => !filter || e.name.toLowerCase().includes(filter)).slice(0, 500);
+  if (!list.length) {
+    grid.innerHTML = '<div class="gif-status">Kuch nahi mila</div>';
+    return;
+  }
+  list.forEach(e => {
+    const b = document.createElement('button');
+    b.title = e.name + ' (' + e.provider.toUpperCase() + ')';
+    const img = document.createElement('img');
+    img.src = e.url; img.loading = 'lazy'; img.alt = e.name;
+    const nm = document.createElement('span');
+    nm.textContent = e.name;
+    b.append(img, nm);
+    b.onclick = ev => { ev.stopPropagation(); pickSeven(e); };
+    grid.appendChild(b);
+  });
+}
+function pickSeven(e) {
+  if (pickerMode === 'input') {
+    const inp = $('messageInput');
+    const s = inp.selectionStart ?? inp.value.length;
+    const en = inp.selectionEnd ?? inp.value.length;
+    inp.value = inp.value.slice(0, s) + e.name + ' ' + inp.value.slice(en);
+    inp.focus();
+    try { inp.setSelectionRange(s + e.name.length + 1, s + e.name.length + 1); } catch {}
+    return;
+  }
+  const token = e.provider + ':' + e.id;
+  if (pickerMode === 'super' && pickerFor) { toggleSuperReact(pickerFor, token); closePicker(); return; }
+  if (pickerFor) toggleReact(pickerFor, token);
+  closePicker();
+}
+function insertSevenCode(name) {
+  const inp = $('messageInput');
+  inp.value = (inp.value ? inp.value.replace(/\s+$/, '') + ' ' : '') + name + ' ';
+  inp.focus();
+}
+document.querySelectorAll('#epTabs button').forEach(b => {
+  b.onclick = ev => {
+    ev.stopPropagation();
+    const t = b.dataset.t;
+    document.querySelectorAll('#epTabs button').forEach(x => x.classList.toggle('on', x === b));
+    $('epWrap').style.display = t === 'emoji' ? '' : 'none';
+    $('epStatus').style.display = t === 'emoji' ? '' : 'none';
+    $('sevenWrap').style.display = t === 'seven' ? 'block' : 'none';
+    if (t === 'seven') buildSeven($('sevenSearch').value || '');
+  };
+});
+$('sevenSearch').addEventListener('input', e => {
+  const q = e.target.value;
+  buildSeven(q);
+  clearTimeout(sevenQT);
+  sevenQT = setTimeout(() => searchSevenTV(q), 400);
+});
+loadSevenTV();
+
+function sysMsg(t) {
+  const d = document.createElement('div');
+  d.className = 'sys';
+  const s = document.createElement('span'); s.textContent = t;
+  d.appendChild(s);
+  $('messages').appendChild(d);
+}
+
+function renderTyping() {
+  const names = [...typingPeers.entries()].filter(([k]) => !k.endsWith(':t')).map(([, v]) => v);
+  $('typing').innerHTML = names.length ? '<b>' + esc(names.slice(0, 3).join(', ')) + '</b> <i>is typing...</i>' : '';
+}
+
+function updateUsers() {
+  const box = $('memberList');
+  box.innerHTML = '';
+  if (!me) return;
+  if (cur && cur.kind === 'dm') {
+    const u = dmProfile(cur);
+    const online = [...cur.peers.values()].some(p => String(p.gh).toLowerCase() === String(u.gh).toLowerCase());
+    $('memberLabel').textContent = online ? 'ONLINE — 2' : 'OFFLINE — 1';
+    $('headCount').textContent = online ? 'online' : 'offline';
+    const all = [{ gh: me.gh, name: me.name, avatar: me.avatar, you: true },
+      { gh: u.gh, name: u.name || u.gh, avatar: u.avatar || '', offline: !online }];
+    all.forEach(renderMemberRow);
+    return;
+  }
+  const all = [{ gh: me.gh, name: me.name, avatar: me.avatar, you: true },
+    ...[...peers.values()].sort((a, b) => a.gh.localeCompare(b.gh))];
+  // same naam do baar nahi (ghost/duplicate tab)
+  const seenGh = new Set();
+  all.filter(u => {
+    const low = String(u.gh).toLowerCase();
+    if (seenGh.has(low)) return false;
+    seenGh.add(low);
+    return true;
+  }).forEach(renderMemberRow);
+  const shown = box.querySelectorAll('.mem').length;
+  $('memberLabel').textContent = 'ONLINE — ' + shown;
+  $('headCount').textContent = shown + ' online';
+}
+function renderMemberRow(u) {
+  const box = $('memberList');
+  const row = document.createElement('div');
+  row.className = 'mem' + (u.you ? ' you' : '');
+  if (u.offline) row.style.opacity = '.55';
+  row.title = '@' + u.gh;
+  row.onclick = () => openProfile(u.gh);
+  const av = document.createElement('div'); av.className = 'av';
+  const img = document.createElement('img');
+  img.src = u.avatar || ghPng(u.gh);
+  img.onerror = () => avatarFallback(img, u.gh);
+  av.appendChild(img);
+  if (!u.offline) {
+    const st = document.createElement('div'); st.className = 'st';
+    av.appendChild(st);
+  }
+  const tx = document.createElement('div');
+  const nm = document.createElement('div'); nm.className = 'n'; nm.textContent = (u.name || u.gh) + (u.you ? ' (you)' : '') + (u.offline ? ' (offline)' : '');
+  const un = document.createElement('div'); un.className = 'u'; un.textContent = '@' + u.gh;
+  tx.append(nm, un);
+  row.append(av, tx);
+  box.appendChild(row);
+}
+
+window.toggleMenu = function (e) {
+  if (e) e.stopPropagation();
+  $('channels').classList.toggle('open');
+};
+document.querySelector('main').addEventListener('click', () => {
+  $('channels').classList.remove('open');
+});
+
+window.copyInvite = function () {
+  const url = new URL(location.href);
+  url.searchParams.set('channel', channelId);
+  const link = url.toString();
+  if (navigator.clipboard) navigator.clipboard.writeText(link).then(() => sysMsg('Invite link copied!')).catch(() => sysMsg(link));
+  else sysMsg(link);
+};
+
+window.leaveChat = function () {
+  try { stopVoice(); } catch {}
+  try { stopRing(); } catch {}
+  convos.forEach(cv => {
+    try { cv.room && cv.room.leave(); } catch {}
+    if (cv.announceTimer) clearInterval(cv.announceTimer);
+  });
+  location.reload();
+};
+</script>
+</body>
+</html>
